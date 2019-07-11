@@ -59,7 +59,9 @@ architecture Behavioral of disassembler is
     signal imm : STD_LOGIC_VECTOR (15 downto 0);
     signal addr : STD_LOGIC_VECTOR (25 downto 0);
     
+    -- Test registers
     signal ascii_register_test : string (1 to 5);
+    signal ascii_register_code : string (1 to 25);
     ---------------------------------------------
     -- FUNCTION FOR R BYTECODE TO ASCII STRING --
     ---------------------------------------------
@@ -144,17 +146,17 @@ architecture Behavioral of disassembler is
     end;
     
     function R_OPCODE_TO_ASCII (
-        funct : in STD_LOGIC_VECTOR (5 downto 0);
+        funct : in STD_LOGIC_VECTOR (7 downto 0);
         rs, rt, rd, shift : in STD_LOGIC_VECTOR (4 downto 0)
     )
-    return STD_LOGIC_VECTOR is
+    return STRING is
     
         -- Variable that will be returned.
         -- Concatenation of OPCODE, RD, RS, RT
-        variable ascii_code : STD_LOGIC_VECTOR (151 downto 0);             
+        variable ascii_code : STRING (1 to 25);             
                        
         -- 5 Characters at most. 40 bits/ 8 bits/char == 5 characters
-        variable ascii_opcode, ascii_rs, ascii_rt, ascii_rd : STRING (0 to 4);  -- MAX OF 5 Characters                     
+        variable ascii_opcode, ascii_rs, ascii_rt, ascii_rd : STRING (1 to 5);  -- MAX OF 5 Characters                     
     
     begin
         -- Funct dictates what mode the ALU is set to.
@@ -165,47 +167,47 @@ architecture Behavioral of disassembler is
         case funct is
             -- ADD
             when X"20" =>
-                ascii_opcode := "add";
+                ascii_opcode := "add  ";
             
             -- ADDU
             when X"21" =>
-                ascii_opcode := "addu";
+                ascii_opcode := "addu ";
             
             -- AND
             when X"24" =>
-                ascii_opcode := "and";
+                ascii_opcode := "and  ";
             
             -- DIV
             when X"1A" =>
-                ascii_opcode := "div";
+                ascii_opcode := "div  ";
             
             -- DIVU
             when X"1B" =>
-                ascii_opcode := "divu";
+                ascii_opcode := "divu ";
             
             -- JR
             when X"08" =>
-                ascii_opcode := "jr";
+                ascii_opcode := "jr   ";
             
             -- MFHI
             when X"10" =>
-                ascii_opcode := "mfhi";
+                ascii_opcode := "mfhi ";
                 
             -- MTHI
             when X"11" =>
-                ascii_opcode := "mthi";
+                ascii_opcode := "mthi ";
             
             -- MFLO
             when X"12" =>
-                ascii_opcode := "mflo";
+                ascii_opcode := "mflo ";
 
             -- MTLO
             when X"13" =>
-                ascii_opcode := "mtlo";
+                ascii_opcode := "mtlo ";
             
             -- MULT
             when X"18" =>
-                ascii_opcode := "mult";
+                ascii_opcode := "mult ";
             
             -- MULTU
             when X"19" =>
@@ -213,50 +215,54 @@ architecture Behavioral of disassembler is
 
             -- NOR
             when X"27" =>
-                ascii_opcode := "nor";
+                ascii_opcode := "nor  ";
 
             -- XOR
             when X"26" =>
-                ascii_opcode := "xor";
+                ascii_opcode := "xor  ";
 
             -- OR
             when X"25" =>
-                ascii_opcode := "or";
+                ascii_opcode := "or   ";
 
             -- SLT
             when X"2A" =>
-                ascii_opcode := "slt";
+                ascii_opcode := "slt  ";
 
             -- SLTU
             when X"2B" =>
-                ascii_opcode := "sltu";
+                ascii_opcode := "sltu ";
 
             -- SLL
             when X"00" =>
-                ascii_opcode := "sll";
+                ascii_opcode := "sll  ";
 
             -- SRL
             when X"02" =>
-                ascii_opcode := "srl";
+                ascii_opcode := "srl  ";
                 
             -- SRA 
             when X"03" =>
-                ascii_opcode := "sra";
+                ascii_opcode := "sra  ";
 
             -- SUB
             when X"22" =>
-                ascii_opcode := "sub";
+                ascii_opcode := "sub  ";
 
             -- SUBU
             when X"23" =>
-                ascii_opcode := "subu";
+                ascii_opcode := "subu ";
             
             -- Unknown Funct
             when others =>
+                ascii_opcode := "     ";
+                
             
         end case;
         
         
+        ascii_code := (ascii_opcode & " " & ascii_rd & ", " & ascii_rs & ", " & ascii_rt);
+        return ascii_code;
     end;
         
     
@@ -275,10 +281,9 @@ begin
             addr => addr
         );
         
-    process (master_clock, rs)
+    process (master_clock, funct, rs, rt, rd, shift)
     begin
-        if rising_edge(master_clock) then 
-            ascii_register_test <= REGISTER_TO_ASCII(rs);
+        if rising_edge(master_clock) then
         end if;
     end process;
         
@@ -290,7 +295,7 @@ begin
                 -- R INSTRUCTIONS --
                 --------------------
                 when X"00" =>
-                   
+                    ascii_register_code <= R_OPCODE_TO_ASCII(funct, rs, rt, rd, shift);                
     
                 --------------------
                 -- I INSTRUCTIONS --

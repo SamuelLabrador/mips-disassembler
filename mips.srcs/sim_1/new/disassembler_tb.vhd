@@ -65,17 +65,21 @@ begin
     
     process begin
     
+        
+        r_INSTRUCTION <= X"00000020";
+        wait for 30 ns;
+    
         -- addi zero,zero,8
-        r_INSTRUCTION <= X"08000020";
-        wait for 30 ns;
+--        r_INSTRUCTION <= X"08000020";
+--        wait for 30 ns;
         
-        -- 
-        r_INSTRUCTION <= X"230FF000";
-        wait for 30 ns;
+--        -- 
+--        r_INSTRUCTION <= X"230FF000";
+--        wait for 30 ns;
         
-        -- 
-        r_INSTRUCTION <= X"000000E3";
-        wait for 30 ns;
+--        -- 
+--        r_INSTRUCTION <= X"000000E3";
+--        wait for 30 ns;
     
     end process;
 end Behavioral;

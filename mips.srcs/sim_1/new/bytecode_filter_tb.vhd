@@ -83,6 +83,9 @@ begin
     process
     begin
         
+        R_INSTRUCTION <= X"00000020";
+        wait for 30 ns;
+        
         R_INSTRUCTION <= X"08000020";
         wait for 30 ns;
 
