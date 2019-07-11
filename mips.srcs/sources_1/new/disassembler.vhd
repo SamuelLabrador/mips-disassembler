@@ -36,7 +36,7 @@ entity disassembler is
     Port (  
             master_clock : in STD_LOGIC;
             instruction  : in STD_LOGIC_VECTOR (31 downto 0);   -- Bytecode instruction
-            code : out STD_LOGIC_VECTOR (151 downto 0)          -- ASCII ASM instruction -- String: 152 bits == 19 bytes == 19 ASCII characters
+            code : out STD_LOGIC_VECTOR (199 downto 0)          -- ASCII ASM instruction -- String: 152 bits == 19 bytes == 19 ASCII characters
            );
 end disassembler;
 
@@ -58,6 +58,7 @@ architecture Behavioral of disassembler is
     signal rs, rt, rd, shift : STD_LOGIC_VECTOR (4 downto 0);
     signal imm : STD_LOGIC_VECTOR (15 downto 0);
     signal addr : STD_LOGIC_VECTOR (25 downto 0);
+    signal ascii_code : string (1 to 25);
     
     -- Test registers
     signal ascii_register_test : string (1 to 5);
@@ -265,6 +266,20 @@ architecture Behavioral of disassembler is
         return ascii_code;
     end;
         
+    function STRING_TO_LOGIC_VECTOR( 
+        target_string : string
+    ) 
+    return STD_LOGIC_VECTOR is
+        variable logic_vector : STD_LOGIC_VECTOR(target_string'length*8-1 downto 0);
+        variable index_upper, index_lower : integer;
+    begin
+        for index in target_string'range loop
+            index_upper := (target_string'length*8 - 1) - (index * 8);
+            index_lower := (target_string'length*8 - 1) - (index * 8 - 1);
+            logic_vector(index_upper downto index_lower) := STD_LOGIC_VECTOR(TO_UNSIGNED(CHARACTER'pos(target_string(index)), 8));
+        end loop;
+        return logic_vector;
+    end function;
     
 begin
 	-- Forward Decleration of filter
@@ -280,13 +295,7 @@ begin
             imm => imm,
             addr => addr
         );
-        
-    process (master_clock, funct, rs, rt, rd, shift)
-    begin
-        if rising_edge(master_clock) then
-        end if;
-    end process;
-        
+               
     process (master_clock, opcode, funct)
     begin
         if rising_edge(master_clock) then
@@ -295,8 +304,8 @@ begin
                 -- R INSTRUCTIONS --
                 --------------------
                 when X"00" =>
-                    ascii_register_code <= R_OPCODE_TO_ASCII(funct, rs, rt, rd, shift);                
-    
+                    ascii_code <= R_OPCODE_TO_ASCII(funct, rs, rt, rd, shift);                
+                    
                 --------------------
                 -- I INSTRUCTIONS --
                 --------------------
@@ -370,6 +379,7 @@ begin
                 when others =>
                 
             end case;
+            code <= STRING_TO_LOGIC_VECTOR(ascii_code);
         end if;
     end process;
     

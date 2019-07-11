@@ -38,14 +38,14 @@ end disassembler_tb;
 architecture Behavioral of disassembler_tb is
     
     signal r_INSTRUCTION : std_logic_vector (31 downto 0);
-    signal r_CODE : std_logic_vector (151 downto 0);
+    signal r_CODE : std_logic_vector (199 downto 0);
     signal r_CLOCK : STD_LOGIC := '0';
     
     component disassembler is
         Port(
             master_clock : in STD_LOGIC;
             instruction : in std_logic_vector (31 downto 0);
-            code : out std_logic_vector (151 downto 0)
+            code : out std_logic_vector (199 downto 0)
         );
     end component disassembler;
     
@@ -60,15 +60,21 @@ begin
     
     process begin
         r_CLOCK <= not r_CLOCK;
-        wait for 10 ns;
+        wait for 1 ns;
     end process;
     
     process begin
     
+        -- TEST ALU FUNCT
         
+        -- add
         r_INSTRUCTION <= X"00000020";
-        wait for 30 ns;
-    
+        wait for  2 ns;
+        
+        -- add $t1, $t1, $t0
+        r_INSTRUCTION <= X"01284820";
+        wait for 2 ns;
+        
         -- addi zero,zero,8
 --        r_INSTRUCTION <= X"08000020";
 --        wait for 30 ns;
