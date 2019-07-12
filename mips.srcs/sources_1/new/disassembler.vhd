@@ -63,10 +63,7 @@ architecture Behavioral of disassembler is
     -- Test registers
     signal ascii_register_test : string (1 to 5);
     signal ascii_register_code : string (1 to 25);
-    ---------------------------------------------
-    -- FUNCTION FOR R BYTECODE TO ASCII STRING --
-    ---------------------------------------------
-    
+
     function REGISTER_TO_ASCII(
         reg : in STD_LOGIC_VECTOR (4 downto 0)
     )
@@ -146,7 +143,8 @@ architecture Behavioral of disassembler is
         return ascii_register;
     end;
     
-    function R_OPCODE_TO_ASCII (
+    
+    function R_INSTRUCTION_TO_ASCII (
         funct : in STD_LOGIC_VECTOR (7 downto 0);
         rs, rt, rd, shift : in STD_LOGIC_VECTOR (4 downto 0)
     )
@@ -257,26 +255,39 @@ architecture Behavioral of disassembler is
             -- Unknown Funct
             when others =>
                 ascii_opcode := "     ";
-                
-            
         end case;
-        
-        
         ascii_code := (ascii_opcode & " " & ascii_rd & ", " & ascii_rs & ", " & ascii_rt);
         return ascii_code;
     end;
-        
+    
+    function I_INSTRUCTION_TO_ASCII(
+        opcode : STRING (1 to 5);
+        rs, rt : STD_LOGIC_VECTOR (4 downto 0);
+        imm : STD_LOGIC_VECTOR(15 downto 0)
+    )
+    return STRING is 
+        variable ascii_code : STRING(1 to 25);
+    begin
+        case opcode is
+            when "bne  "=>
+                
+            when "beq  "=>
+                
+            when others =>
+                
+        end case;
+        return ascii_code;
+    end;
+    
     function STRING_TO_LOGIC_VECTOR( 
         target_string : string
     ) 
     return STD_LOGIC_VECTOR is
         variable logic_vector : STD_LOGIC_VECTOR(target_string'length*8-1 downto 0);
-        variable index_upper, index_lower : integer;
+--        variable index_upper, index_lower : integer;
     begin
         for index in target_string'range loop
-            index_upper := (target_string'length*8 - 1) - (index * 8);
-            index_lower := (target_string'length*8 - 1) - (index * 8 - 1);
-            logic_vector(index_upper downto index_lower) := STD_LOGIC_VECTOR(TO_UNSIGNED(CHARACTER'pos(target_string(index)), 8));
+            logic_vector(index*8-1 downto index*8-8) := STD_LOGIC_VECTOR(TO_UNSIGNED(CHARACTER'pos(target_string(target_string'length - index + 1)), 8));
         end loop;
         return logic_vector;
     end function;
@@ -304,7 +315,7 @@ begin
                 -- R INSTRUCTIONS --
                 --------------------
                 when X"00" =>
-                    ascii_code <= R_OPCODE_TO_ASCII(funct, rs, rt, rd, shift);                
+                    ascii_code <= R_INSTRUCTION_TO_ASCII(funct, rs, rt, rd, shift);                
                     
                 --------------------
                 -- I INSTRUCTIONS --
@@ -312,57 +323,75 @@ begin
                 
                 -- ADD IMMEDIATE
                 when X"08" =>
-                
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("addi ", rs, rt, imm);
+                    
                 -- ADD UNSIGNED IMMEDIATE
                 when X"09" =>
-                
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("addiu", rs, rt, imm);
+                    
                 -- AND IMMEDIATE
                 when X"0C" =>
-                
-                -- BEQ IMMEDIATE
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("andi ", rs, rt, imm);
+                    
+                -- BEQ IMMEDIATE SPECIAL CASE
                 when X"04" =>
-    
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("beq  ", rs, rt, imm);
+                    
                 -- BLEZ
                 when X"06" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("blez ", rs, rt, imm);
     
                 -- BNE
                 when X"05" =>
-    
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("bne  ", rs, rt, imm);
+        
                 -- BGTZ
                 when X"07" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("bgtz ", rs, rt, imm);
     
                 -- LB
                 when X"20" =>
-    
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("lb   ", rs, rt, imm);
+                                
                 -- LBU
                 when X"24" =>
-    
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("lbu  ", rs, rt, imm);
+        
                 -- LHU
                 when X"25" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("lhu  ", rs, rt, imm);
     
                 -- LUI
                 when X"0F" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("lui  ", rs, rt, imm);
     
                 -- LW
                 when X"23" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("lw   ", rs, rt, imm);
     
                 -- ORI
                 when X"0D" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("ori  ", rs, rt, imm);
     
                 -- SB
                 when X"28" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("sb   ", rs, rt, imm);
     
                 -- SH
                 when X"29" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("sh   ", rs, rt, imm);
     
                 -- SLTI
                 when X"0A" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("slti ", rs, rt, imm);
     
                 -- SLTIU
                 when X"0B" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("sltiu", rs, rt, imm);
     
                 -- SW
                 when X"2B" =>
+                    ascii_code <= I_INSTRUCTION_TO_ASCII("sw   ", rs, rt, imm);
     
     
                 --------------------
@@ -379,7 +408,9 @@ begin
                 when others =>
                 
             end case;
+            
             code <= STRING_TO_LOGIC_VECTOR(ascii_code);
+        
         end if;
     end process;
     
