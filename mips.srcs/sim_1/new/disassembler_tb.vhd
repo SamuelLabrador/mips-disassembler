@@ -38,14 +38,14 @@ end disassembler_tb;
 architecture Behavioral of disassembler_tb is
     
     signal r_INSTRUCTION : std_logic_vector (31 downto 0);
-    signal r_CODE : std_logic_vector (199 downto 0);
+    signal r_CODE : std_logic_vector (207 downto 0);
     signal r_CLOCK : STD_LOGIC := '0';
     
     component disassembler is
         Port(
             master_clock : in STD_LOGIC;
             instruction : in std_logic_vector (31 downto 0);
-            code : out std_logic_vector (199 downto 0)
+            code : out std_logic_vector (207 downto 0)
         );
     end component disassembler;
     

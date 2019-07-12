@@ -36,7 +36,7 @@ entity disassembler is
     Port (  
             master_clock : in STD_LOGIC;
             instruction  : in STD_LOGIC_VECTOR (31 downto 0);   -- Bytecode instruction
-            code : out STD_LOGIC_VECTOR (199 downto 0)          -- ASCII ASM instruction -- String: 152 bits == 19 bytes == 19 ASCII characters
+            code : out STD_LOGIC_VECTOR (207 downto 0)          -- ASCII ASM instruction -- String: 152 bits == 19 bytes == 19 ASCII characters
            );
 end disassembler;
 
@@ -58,12 +58,72 @@ architecture Behavioral of disassembler is
     signal rs, rt, rd, shift : STD_LOGIC_VECTOR (4 downto 0);
     signal imm : STD_LOGIC_VECTOR (15 downto 0);
     signal addr : STD_LOGIC_VECTOR (25 downto 0);
-    signal ascii_code : string (1 to 25);
+    signal ascii_code : string (1 to 26);
     
     -- Test registers
     signal ascii_register_test : string (1 to 5);
-    signal ascii_register_code : string (1 to 25);
-
+    signal ascii_register_code : string (1 to 26);
+        
+--    --COVERTS NIBBLE TO HEX CHARACTER
+--    function NIBBLE_TO_HEX(
+--        nibble : STD_LOGIC_VECTOR (3 downto 0)
+--    )
+--    return CHARACTER is
+--        variable hex_string : CHARACTER;
+--    begin
+--        case nibble is
+--            when X"0" =>
+--                hex_string := '0';
+--            when X"1" => 
+--                hex_string := '1';
+--            when X"2" =>
+--                hex_string := '2';
+--            when X"3" =>
+--                hex_string := '3';
+--            when X"4" =>
+--                hex_string := '4';
+--            when X"5" =>
+--                hex_string := '5';
+--            when X"6" =>
+--                hex_string := '6';
+--            when X"7" =>
+--                hex_string := '7';
+--            when X"8" =>
+--                hex_string := '8';
+--            when X"9" =>
+--                hex_string := '9';
+--            when X"A" =>
+--                hex_string := 'A';
+--            when X"B" =>
+--                hex_string := 'B';
+--            when X"C" =>
+--                hex_string := 'C';
+--            when X"D" =>
+--                hex_string := 'D';
+--            when X"E" =>
+--                hex_string := 'E';
+--            when X"F" =>
+--                hex_string := 'F';
+--        end case;
+--        return hex_string;
+--    end function;
+    
+--    -- CONVERTS LOGIC VECTOR TO HEX STRING. ASCII ENCODED
+--    function LOGIC_VECTOR_TO_HEX_STRING(
+--        target_vector : STD_LOGIC_VECTOR (15 downto 0)
+--    )
+--    return STRING is 
+--        variable hex_string : STRING (1 to 6);
+--    begin
+--        hex_string := "0x" 
+--            & NIBBLE_TO_HEX(target_vector(15 downto 12)) 
+--            & NIBBLE_TO_HEX(target_vector(11 downto 8))
+--            & NIBBLE_TO_HEX(target_vector(7 downto 4))
+--            & NIBBLE_TO_HEX(target_vector(3 downto 0));
+--        return hex_string;
+--    end function;
+    
+    -- CONVERTS REGISTER TO 5 CHARACTER STRING
     function REGISTER_TO_ASCII(
         reg : in STD_LOGIC_VECTOR (4 downto 0)
     )
@@ -142,8 +202,7 @@ architecture Behavioral of disassembler is
         
         return ascii_register;
     end;
-    
-    
+       
     function R_INSTRUCTION_TO_ASCII (
         funct : in STD_LOGIC_VECTOR (7 downto 0);
         rs, rt, rd, shift : in STD_LOGIC_VECTOR (4 downto 0)
@@ -152,7 +211,7 @@ architecture Behavioral of disassembler is
     
         -- Variable that will be returned.
         -- Concatenation of OPCODE, RD, RS, RT
-        variable ascii_code : STRING (1 to 25);             
+        variable ascii_code : STRING (1 to 26);             
                        
         -- 5 Characters at most. 40 bits/ 8 bits/char == 5 characters
         variable ascii_opcode, ascii_rs, ascii_rt, ascii_rd : STRING (1 to 5);  -- MAX OF 5 Characters                     
@@ -256,7 +315,7 @@ architecture Behavioral of disassembler is
             when others =>
                 ascii_opcode := "     ";
         end case;
-        ascii_code := (ascii_opcode & " " & ascii_rd & ", " & ascii_rs & ", " & ascii_rt);
+        ascii_code := (ascii_opcode & " " & ascii_rd & ", " & ascii_rs & ", " & ascii_rt & " ");
         return ascii_code;
     end;
     
@@ -266,15 +325,13 @@ architecture Behavioral of disassembler is
         imm : STD_LOGIC_VECTOR(15 downto 0)
     )
     return STRING is 
-        variable ascii_code : STRING(1 to 25);
+        variable ascii_code : STRING(1 to 26);
     begin
         case opcode is
             when "bne  "=>
-                
             when "beq  "=>
-                
             when others =>
-                
+--                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & ", " & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ")";
         end case;
         return ascii_code;
     end;
@@ -291,7 +348,7 @@ architecture Behavioral of disassembler is
         end loop;
         return logic_vector;
     end function;
-    
+
 begin
 	-- Forward Decleration of filter
     filter : bytecode_filter 
