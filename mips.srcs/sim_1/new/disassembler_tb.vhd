@@ -60,7 +60,7 @@ begin
     
     process begin
         r_CLOCK <= not r_CLOCK;
-        wait for 10 ns;
+        wait for 5 ns;
     end process;
     
     process begin
@@ -69,16 +69,27 @@ begin
         
         -- add
         r_INSTRUCTION <= X"00000020";
-        wait for  500 ns;
+        wait for  100 ns;
         
         -- add $t1, $t1, $t0
         r_INSTRUCTION <= X"01284820";
-        wait for 500 ns;
+        wait for 100 ns;
         
-        -- addi zero,zero,8
---        r_INSTRUCTION <= X"08000020";
---        wait for 30 ns;
+        -- addi $s1, $s0, 0xFFFF
+        r_INSTRUCTION <= X"2211FFFF";
+        wait for 100 ns;
         
+        -- slti $s1, $s0, 0xFFFF 
+        r_INSTRUCTION <= X"2A11FFFF";
+        wait for 100 ns;
+        
+        -- lw $at, 100($v0)
+        r_INSTRUCTION <= X"8c410064";
+        wait for 100 ns;
+        
+        -- j 
+        r_INSTRUCTION <= X"08000003";
+        wait for 100 ns;
 --        -- 
 --        r_INSTRUCTION <= X"230FF000";
 --        wait for 30 ns;

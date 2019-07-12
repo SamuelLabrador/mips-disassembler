@@ -64,64 +64,84 @@ architecture Behavioral of disassembler is
     signal ascii_register_test : string (1 to 5);
     signal ascii_register_code : string (1 to 26);
         
---    --COVERTS NIBBLE TO HEX CHARACTER
---    function NIBBLE_TO_HEX(
---        nibble : STD_LOGIC_VECTOR (3 downto 0)
---    )
---    return CHARACTER is
---        variable hex_string : CHARACTER;
---    begin
---        case nibble is
---            when X"0" =>
---                hex_string := '0';
---            when X"1" => 
---                hex_string := '1';
---            when X"2" =>
---                hex_string := '2';
---            when X"3" =>
---                hex_string := '3';
---            when X"4" =>
---                hex_string := '4';
---            when X"5" =>
---                hex_string := '5';
---            when X"6" =>
---                hex_string := '6';
---            when X"7" =>
---                hex_string := '7';
---            when X"8" =>
---                hex_string := '8';
---            when X"9" =>
---                hex_string := '9';
---            when X"A" =>
---                hex_string := 'A';
---            when X"B" =>
---                hex_string := 'B';
---            when X"C" =>
---                hex_string := 'C';
---            when X"D" =>
---                hex_string := 'D';
---            when X"E" =>
---                hex_string := 'E';
---            when X"F" =>
---                hex_string := 'F';
---        end case;
---        return hex_string;
---    end function;
+    --COVERTS NIBBLE TO HEX CHARACTER
+    function NIBBLE_TO_HEX(
+        nibble : STD_LOGIC_VECTOR (3 downto 0)
+    )
+    return CHARACTER is
+        variable hex_string : CHARACTER;
+    begin
+        case nibble is
+            when X"0" =>
+                hex_string := '0';
+            when X"1" => 
+                hex_string := '1';
+            when X"2" =>
+                hex_string := '2';
+            when X"3" =>
+                hex_string := '3';
+            when X"4" =>
+                hex_string := '4';
+            when X"5" =>
+                hex_string := '5';
+            when X"6" =>
+                hex_string := '6';
+            when X"7" =>
+                hex_string := '7';
+            when X"8" =>
+                hex_string := '8';
+            when X"9" =>
+                hex_string := '9';
+            when X"A" =>
+                hex_string := 'A';
+            when X"B" =>
+                hex_string := 'B';
+            when X"C" =>
+                hex_string := 'C';
+            when X"D" =>
+                hex_string := 'D';
+            when X"E" =>
+                hex_string := 'E';
+            when X"F" =>
+                hex_string := 'F';
+        end case;
+        return hex_string;
+    end function;
     
---    -- CONVERTS LOGIC VECTOR TO HEX STRING. ASCII ENCODED
---    function LOGIC_VECTOR_TO_HEX_STRING(
---        target_vector : STD_LOGIC_VECTOR (15 downto 0)
---    )
---    return STRING is 
---        variable hex_string : STRING (1 to 6);
---    begin
---        hex_string := "0x" 
---            & NIBBLE_TO_HEX(target_vector(15 downto 12)) 
---            & NIBBLE_TO_HEX(target_vector(11 downto 8))
---            & NIBBLE_TO_HEX(target_vector(7 downto 4))
---            & NIBBLE_TO_HEX(target_vector(3 downto 0));
---        return hex_string;
---    end function;
+    -- CONVERTS LOGIC VECTOR TO HEX STRING. ASCII ENCODED
+    function LOGIC_VECTOR_TO_HEX_STRING(
+        target_vector : STD_LOGIC_VECTOR (15 downto 0)
+    )
+    return STRING is 
+        variable hex_string : STRING (1 to 6);
+    begin
+        
+        hex_string := "0x" 
+            & NIBBLE_TO_HEX(target_vector(15 downto 12)) 
+            & NIBBLE_TO_HEX(target_vector(11 downto 8))
+            & NIBBLE_TO_HEX(target_vector(7 downto 4))
+            & NIBBLE_TO_HEX(target_vector(3 downto 0));
+        return hex_string;
+    end function;
+    
+    -- CONVERTS LOGIC VECTOR TO HEX STRING. ASCII ENCODED
+    function ADDRESS_TO_HEX_STRING(
+        target_vector : STD_LOGIC_VECTOR (25 downto 0)
+    )
+    return STRING is 
+        variable hex_string : STRING (1 to 9);
+    begin
+        
+        hex_string := "0x" 
+            & NIBBLE_TO_HEX("00" & target_vector(25 downto 24))
+            & NIBBLE_TO_HEX(target_vector(23 downto 20))
+            & NIBBLE_TO_HEX(target_vector(19 downto 16))
+            & NIBBLE_TO_HEX(target_vector(15 downto 12)) 
+            & NIBBLE_TO_HEX(target_vector(11 downto 8))
+            & NIBBLE_TO_HEX(target_vector(7 downto 4))
+            & NIBBLE_TO_HEX(target_vector(3 downto 0));
+        return hex_string;
+    end function;   
     
     -- CONVERTS REGISTER TO 5 CHARACTER STRING
     function REGISTER_TO_ASCII(
@@ -138,8 +158,10 @@ architecture Behavioral of disassembler is
                 ascii_register := "$zero";
             when 1 =>
                 ascii_register := "$at  ";
-            when 3 =>
+            when 2 =>
                 ascii_register := "$v0  ";
+            when 3 =>
+                ascii_register := "$v1  ";
             when 4 =>
                 ascii_register := "$10  ";
             when 5 =>
@@ -328,10 +350,12 @@ architecture Behavioral of disassembler is
         variable ascii_code : STRING(1 to 26);
     begin
         case opcode is
-            when "bne  "=>
-            when "beq  "=>
+            when "lw   "=>
+                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & "," & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ") ";
+            when "sw   "=>
+                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & "," & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ") ";
             when others =>
---                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & ", " & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ")";
+                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & ", " & REGISTER_TO_ASCII(rs) & ", " & LOGIC_VECTOR_TO_HEX_STRING(imm);
         end case;
         return ascii_code;
     end;
@@ -341,7 +365,6 @@ architecture Behavioral of disassembler is
     ) 
     return STD_LOGIC_VECTOR is
         variable logic_vector : STD_LOGIC_VECTOR(target_string'length*8-1 downto 0);
---        variable index_upper, index_lower : integer;
     begin
         for index in target_string'range loop
             logic_vector(index*8-1 downto index*8-8) := STD_LOGIC_VECTOR(TO_UNSIGNED(CHARACTER'pos(target_string(target_string'length - index + 1)), 8));
@@ -457,10 +480,11 @@ begin
                 
                 -- J
                 when X"02" =>
-    
+                    -- 5 characters for instruction. 9 characters for address
+                    ascii_code <= "j     " & ADDRESS_TO_HEX_STRING(addr) & "           ";
                 -- JAL
                 when X"03" =>
-                
+                    ascii_code <= "jal   " & ADDRESS_TO_HEX_STRING(addr) & "           ";
                 -- Unknown OPCODE
                 when others =>
                 
