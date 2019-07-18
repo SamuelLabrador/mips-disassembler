@@ -41,18 +41,18 @@ architecture Behavioral of disassembler_tb is
     signal r_CODE : std_logic_vector (207 downto 0);
     signal r_CLOCK : STD_LOGIC := '0';
     
-    component disassembler is
+    component processing_unit is
         Port(
             clock : in STD_LOGIC;
             instruction : in std_logic_vector (31 downto 0);
             code : out std_logic_vector (207 downto 0)
         );
-    end component disassembler;
+    end component processing_unit;
     
     
 begin
 
-    UUT : disassembler port map(
+    UUT : processing_unit port map(
         clock => r_CLOCK,
         instruction => r_INSTRUCTION,
         code => r_CODE

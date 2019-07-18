@@ -42,7 +42,7 @@ end disassembler;
 
 architecture Structural of disassembler is
     begin
-    
+        
     process
     begin
     
