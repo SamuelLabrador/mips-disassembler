@@ -43,7 +43,7 @@ architecture Behavioral of disassembler_tb is
     
     component disassembler is
         Port(
-            master_clock : in STD_LOGIC;
+            clock : in STD_LOGIC;
             instruction : in std_logic_vector (31 downto 0);
             code : out std_logic_vector (207 downto 0)
         );
@@ -53,7 +53,7 @@ architecture Behavioral of disassembler_tb is
 begin
 
     UUT : disassembler port map(
-        master_clock => r_CLOCK,
+        clock => r_CLOCK,
         instruction => r_INSTRUCTION,
         code => r_CODE
     );

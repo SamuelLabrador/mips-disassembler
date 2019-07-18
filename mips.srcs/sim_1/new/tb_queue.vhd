@@ -105,7 +105,6 @@ architecture Behavioral of tb_queue is
         
         r_enable_read <= '0';
         
-        
     end process;
     
 end Behavioral;
