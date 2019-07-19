@@ -33,11 +33,10 @@ USE ieee.numeric_std.ALL;
 --use UNISIM.VComponents.all;
 
 entity disassembler is
-    Port (  
-            master_clock : in STD_LOGIC;
-            instruction  : in STD_LOGIC_VECTOR (31 downto 0);   -- Bytecode instruction
-            code : out STD_LOGIC_VECTOR (207 downto 0)          -- ASCII ASM instruction -- String: 152 bits == 19 bytes == 19 ASCII characters
-           );
+    Port (
+            clk_master : in STD_LOGIC
+            
+    );
 end disassembler;
 
 architecture Structural of disassembler is
