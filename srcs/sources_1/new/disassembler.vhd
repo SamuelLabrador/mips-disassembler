@@ -35,13 +35,14 @@ USE ieee.numeric_std.ALL;
 entity disassembler is
 
     generic (
-        READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"0000";
-        WRITE_ADDR : STD_LOGIC_VECTOR (12 downto 0) :=  '0' & X"0000";
-        DEVICE_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"005E00FACE";
+        READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"000";
+        WRITE_ADDR : STD_LOGIC_VECTOR (12 downto 0) :=  '0' & X"000";
+        DEVICE_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) :=      X"00005E00FACE";
         DESTINATION_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
         
-        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"07F4";
-        TRANSMIT_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"07FC"
+        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7F4";
+        TRANSMIT_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7FC";
+        RECEIVE_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"7FC"
     );
     
     Port (
@@ -81,73 +82,6 @@ architecture Structural of disassembler is
     signal bresp, rresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
     
     signal init_flag : STD_LOGIC := '0';
-    
-
-    -- FUNCTIONS FOR BUS
-
-    -- Set write address. 
-    -- Returns 1 if there was a transfer
-    -- Returns 0 if there was no transfer
---    impure function write_address(
---        address : STD_LOGIC_VECTOR (12 DOWNTO 0)
---    )
---    return STD_LOGIC is
---    begin 
---        if (awvalid = '0') then
---            awvalid <= '1';                 -- SIGNAL THAT WE HAVE VALID DATA
---            awaddr <= address;              -- SET WRITE ADDRESS
---        elsif(awready = '1') then          -- WAIT FOR BUS TO BE READY
---            awvalid <= '0';             -- DESSERT AWVALID DATA
---            return '1';                 -- SUCCESSFUL TRANSER
---        end if;
---        return '0';                     -- DATA HAS NOT BEEN TRANSFERED YET
---    end function;
-
-    -- Write data to pre-designated memory address
-    -- Returns 1 if there was a transfer
-    -- Returns 0 if there was no trasfer
---    impure function write_data(
---        data : STD_LOGIC_VECTOR (31 downto 0)
---    )
---    return STD_LOGIC is 
---    begin
---        if (wvalid = '-') then
---            wvalid <= '1';
---            wdata <= data;
---        elsif(wread = '1') then
---            wvalid <= '1';
---            return '1';
---        end if;
-
---        return '0';
---    end function;
-
---    function read_address(
---        address : STD_LOGIC_VECTOR (12 DOWNTO 0)
---    )
---    return STD_LOGIC is
---    begin
---        if (arvalid = '0') then
---            arvalid <= '1';
---            araddr <= address;
---        elsif(arready = '1') then
---            arvalid <= '0';
---        end if;
---    end function;
-
-    -- FUNCTION TO READ DATA
---    function read_data
---    return STD_LOGIC
---    begin
---        if (rready = '0') then
---            rready <= '1';
---        elsif (rvalid ='1') then
---            rread <= '0';
---            return '1';
---        end if;
---        return '0';
-         
---    end function;
 
     -- AXI
     component axi_ethernetlite_0 IS
@@ -199,6 +133,7 @@ architecture Structural of disassembler is
     end component axi_ethernetlite_0;
     
     begin
+      
     
     ethernet_module : axi_ethernetlite_0 port map(
 		s_axi_aclk => CLK100MHZ,
@@ -239,35 +174,108 @@ architecture Structural of disassembler is
 		phy_tx_data => eth_txd
     );
     
-    -- READ FROM INPUT BUFFER
-    receive : process(CLK100MHZ)
-        begin
-            
-        if rising_edge(CLK100MHZ) then
-            -- Initial setup
-            if(init_flag = '0') then    
-                araddr <= READ_ADDR;
-                
-            elsif (rvalid = '1') then
-            
-                if (rready = '0') then
-                    
-                    rready <= '1';
-                    led <= rdata (3 downto 0);
-                else
-                    rready <= '0';
-                end if;
-            end if;
+    -- IGNORE THIS MODULE
+    -- UNUSED SIGNALS
+    process(CLK100MHZ) 
+        variable dead : STD_LOGIC := '0';
+    begin
+        if rising_edge(CLK100MHZ) then 
+            bready <= '0';
+            dead := bvalid;
+            wstrb <= X"0";
         end if;
+        
     end process;
-
+    
     -- SEND DATA OUT
-    transmit : process(CLK100MHZ) 
+    transmit : process(CLK100MHZ, reset) 
+        
+        -- 0 Means Receive
+        -- 1 Means Transmit
+        variable mode: STD_LOGIC := '0';
+        variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
+        
         variable state : INTEGER := 0;
         variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
-        variable transmit_register : STD_LOGIC_VECTOR (15 downto 0);
-        begin    
-            if rising_edge(CLK100MHZ) then
+        variable config_register : STD_LOGIC_VECTOR (31 downto 0);
+        
+    begin    
+        led <= std_logic_vector(to_unsigned(state + 1, 4));
+            if reset = '1' then 
+                state := 0;
+            elsif mode = '0' then
+                case state is
+                    
+                    -- SET READ ADDRESS
+                    when 0 =>
+                        if(arvalid /= '1') then
+                            arvalid <= '1';
+                            araddr <= RECEIVE_STATUS_ADDRESS;
+                        elsif (arready = '1') then
+                            arvalid <= '0';
+                            state := state + 1;
+                        end if;
+                        
+                    -- READ DATA FROM ADDRESS
+                    when 1 =>
+                        if(rready /= '1') then
+                            rready <= '1';
+                        elsif (rvalid = '1') then 
+                            rready <= '0';
+                            config_register := rdata;
+                            -- DATA ON BUS
+                            if (config_register(0) = '1') then
+                                state := state + 1;
+                                led <= X"1";
+                            end if;
+                        end if;
+                        
+                    -- SET READ DATA ADDRESS
+                    when 2 =>
+                        if(arvalid /= '1') then
+                            arvalid <= '1';
+                            araddr <= READ_ADDR;
+                        elsif(arready = '1') then
+                            arvalid <= '1';
+                            state := state + 1;
+                        end if;
+                        
+                    when 3 =>
+                        if(rready /= '1') then
+                            rready <= '1';
+                        elsif(rvalid = '1') then
+                            if(rdata = X"A0A0A0A0") then
+                                led <= X"F";
+                            elsif rdata = X"FFFF0000" then
+                                led <= X"A";
+                                mode := '1';
+                            state := state + 1;
+                            end if;
+                        end if;
+                        
+                   when 4 =>
+                        if(awvalid /= '1') then
+                            awvalid <= '1';
+                            awaddr <= RECEIVE_STATUS_ADDRESS;
+                        elsif (awready = '1') then
+                            awvalid <= '0';
+                            state := state + 1;
+                        end if;
+                        
+                    when 5 =>
+                        if(wvalid /= '1') then
+                            wvalid <= '1';
+                            wdata <= config_register and X"FFFFFFFE";
+                        elsif (wready = '1') then
+                            wvalid <= '0';
+                            state := 0;
+                        end if;
+                        
+                    when others =>
+                        state := 0;
+                end case;
+                
+            elsif mode = '1' then
                 case state is 
                 
                     -- PHASE 1 --
@@ -307,7 +315,7 @@ architecture Structural of disassembler is
                         -- Send 4 bytes
                         if (wvalid = '0') then           -- Write Data
                             wvalid <= '1';
-                            wdata <= X"0004";
+                            wdata <= X"00000004";
                         elsif(wready = '1') then
                             wvalid <= '0';
                             state := state + 1;
@@ -337,14 +345,14 @@ architecture Structural of disassembler is
                             rready <= '1';
                         elsif (rvalid ='1') then
                             rready <= '0';
-                            transmit_register := rdata;
+                            config_register := rdata;
                             state := state + 1;
                         end if;
 
                     when 7=>
                         if (wvalid = '0') then
                             wvalid <= '1';
-                            wdata <= (transmit_register or X"0001");
+                            wdata <= (config_register or X"00000001");
                         elsif(wready = '1') then
                             wvalid <= '1';
                             state := state + 1;
@@ -361,6 +369,9 @@ architecture Structural of disassembler is
                                 rready <= '0';
                             end if;
                         end if;
+                        
+                    when others =>
+                        state := 0;
                 end case;
             end if;
     end process;
