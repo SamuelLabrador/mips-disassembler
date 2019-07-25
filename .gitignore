@@ -6,5 +6,5 @@
 *.jou
 *.log
 *.str
-mips.xpr
-.Xil
+*.xpr
+*.Xil
