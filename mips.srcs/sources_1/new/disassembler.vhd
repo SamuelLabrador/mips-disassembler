@@ -59,34 +59,54 @@ end disassembler;
 architecture Structural of disassembler is
 
 
-    -- ETHERNET SIGNALS
-    signal waddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
-    signal din, dout : STD_LOGIC_VECTOR (31 DOWNTO 0);
-    signal wvalid, wready : STD_LOGIC;
-    signal 
+    -- AXI BUS SIGNALS
+    signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
+    signal awaddr, araddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
+    signal wvalid, wready, arvalid, arready,  : STD_LOGIC;
     
+    -- AXI DEAD SIGNALS
+    signal irpt, bready : STD_LOGIC; 
+    signal wstrb : STD_LOGIC_VECTOR (3 downto 0);
+    signal bresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+    -- AXI
     component axi_ethernetlite_0 IS
       PORT (
-        s_axi_aclk : IN STD_LOGIC;
-        s_axi_aresetn : IN STD_LOGIC;
-        ip2intc_irpt : OUT STD_LOGIC;
-        s_axi_awaddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0);
-        s_axi_awvalid : IN STD_LOGIC;
-        s_axi_awready : OUT STD_LOGIC;
-        s_axi_wdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
-        s_axi_wstrb : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
-        s_axi_wvalid : IN STD_LOGIC;
-        s_axi_wready : OUT STD_LOGIC;
-        s_axi_bresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
-        s_axi_bvalid : OUT STD_LOGIC;
-        s_axi_bready : IN STD_LOGIC;
-        s_axi_araddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0);
-        s_axi_arvalid : IN STD_LOGIC;
-        s_axi_arready : OUT STD_LOGIC;
-        s_axi_rdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
-        s_axi_rresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
-        s_axi_rvalid : OUT STD_LOGIC;
-        s_axi_rready : IN STD_LOGIC;
+
+      	
+        s_axi_aclk : IN STD_LOGIC;							-- Clock Source
+        s_axi_aresetn : IN STD_LOGIC;						-- Global reset source, active-Low.
+        ip2intc_irpt : OUT STD_LOGIC;						-- Interupt Signal
+
+        -- Write Address Channel
+        s_axi_awaddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0);	-- Write address
+        s_axi_awvalid : IN STD_LOGIC;						-- Assert Write valid
+        s_axi_awready : OUT STD_LOGIC;						-- Write ready
+        
+        -- Write Data Channel
+        s_axi_wdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);		-- Write Data
+        s_axi_wstrb : IN STD_LOGIC_VECTOR(3 DOWNTO 0);		-- Write Strobe
+        s_axi_wvalid : IN STD_LOGIC;						-- Write valide
+        s_axi_wready : OUT STD_LOGIC;						-- Write Ready
+       
+        -- WRITE RESPONSE DATA CHANNEL
+        -- DO NOT NEED TO USE IN DESIGN
+        s_axi_bresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);		-- Response
+        s_axi_bvalid : OUT STD_LOGIC;						-- Valid
+        s_axi_bready : IN STD_LOGIC;						-- Ready
+        
+        -- Read Address Channel
+        s_axi_araddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0); 	-- Read Address
+        s_axi_arvalid : IN STD_LOGIC;						-- Read Valid
+        s_axi_arready : OUT STD_LOGIC;						-- Read Ready
+        
+        -- Read Data Channel
+        s_axi_rdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);	-- Read Data
+        s_axi_rresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);		-- Read Response Channel
+        s_axi_rvalid : OUT STD_LOGIC;						-- Read Valid
+        s_axi_rready : IN STD_LOGIC;						-- Read Ready
+
+        -- PHYSICAL COMPONENTS
         phy_tx_clk : IN STD_LOGIC;
         phy_rx_clk : IN STD_LOGIC;
         phy_crs : IN STD_LOGIC;
@@ -109,38 +129,47 @@ architecture Structural of disassembler is
     ethernet_module : axi_ethernetlite_0 port map(
 		s_axi_aclk => clk_master,
 		s_axi_aresetn => reset,
-		--ip2intc_irpt : OUT STD_LOGIC;
+		ip2intc_irpt => irpt,		-- NOT USED IN DESIGN
 		s_axi_awaddr => waddr,
 		s_axi_awvalid => wvalid,
 		s_axi_awready => wready,
 		s_axi_wdata => din,
-		--s_axi_wstrb : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
-		--s_axi_wvalid : IN STD_LOGIC;
-		--s_axi_wready : OUT STD_LOGIC;
-		--s_axi_bresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
-		--s_axi_bvalid : OUT STD_LOGIC;
-		--s_axi_bready : IN STD_LOGIC;
-		--s_axi_araddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0);
-		--s_axi_arvalid : IN STD_LOGIC;
-		--s_axi_arready : OUT STD_LOGIC;
-		--s_axi_rdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
-		--s_axi_rresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
-		--s_axi_rvalid : OUT STD_LOGIC;
-		--s_axi_rready : IN STD_LOGIC;
-		--phy_tx_clk : IN STD_LOGIC;
-		--phy_rx_clk : IN STD_LOGIC;
-		--phy_crs : IN STD_LOGIC;
-		--phy_dv : IN STD_LOGIC;
-		--phy_rx_data : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
-		--phy_col : IN STD_LOGIC;
-		--phy_rx_er : IN STD_LOGIC;
-		--phy_rst_n : OUT STD_LOGIC;
-		--phy_tx_en : OUT STD_LOGIC;
-		--phy_tx_data : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
-		--phy_mdio_i : IN STD_LOGIC;
-		--phy_mdio_o : OUT STD_LOGIC;
-		--phy_mdio_t : OUT STD_LOGIC;
-		--phy_mdc : OUT STD_LOGIC
+		s_axi_wstrb => wstrb, 		-- NOT USED IN DESIGN
+		s_axi_wvalid => wvalid,
+		s_axi_wready => wready,
+		s_axi_bresp => bresp,		-- NOT USED IN DESIGN
+		s_axi_bvalid => bvalid,		-- NOT USED IN DESIGN
+		s_axi_bready => bready,
+		s_axi_araddr => araddr,
+		s_axi_arvalid => arvalid,
+		s_axi_arready => arready,
+		s_axi_rdata => rdata,
+		s_axi_rresp => rresp,
+		s_axi_rvalid => rvalid,
+		s_axi_rready => rready,
+
+		-- PHYSICAL DEVICE PORT MAP
+		phy_crs => eth_crs,
+		phy_rx_clk => eth_rx_clk,
+		phy_tx_clk => eth_tx_clk,
+
+		phy_dv => eth_rx_dv,
+		phy_rx_data => eth_rxd,
+		
+		phy_col => eth_col,			-- DUPLEX COLLISION DETECTION
+		
+		phy_rx_er => eth_rx_er,
+		phy_rst_n => eth_rstn,
+
+		phy_tx_en => eth_tx_en,
+		phy_tx_data => eth_txd,
+
+		-- NOT USING MDIO 
+		phy_mdio_i : IN STD_LOGIC;	
+		phy_mdio_o : OUT STD_LOGIC;
+		phy_mdio_t : OUT STD_LOGIC;
+		
+		phy_mdc : OUT STD_LOGIC
     );
         
 --    input_buffer : fifo_generator_0 port map(
