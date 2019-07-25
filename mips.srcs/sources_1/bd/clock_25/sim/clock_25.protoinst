@@ -1,9 +1,0 @@
-{
-	"version": "1.0",
-	"modules": {
-		"clock_25": {
-			"proto_instances": {
-			}
-		}
-	}
-}

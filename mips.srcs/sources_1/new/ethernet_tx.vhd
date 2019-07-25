@@ -35,6 +35,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 -- MII
 entity ethernet_tx is
     Port (
+        -- HARDWARE MAPPED COMPONENTS
         clk_25 : in STD_LOGIC;                      -- 25 Mhz clk
         
         eth_col : in STD_LOGIC;                     
@@ -53,7 +54,12 @@ entity ethernet_tx is
         eth_txd : out STD_LOGIC_VECTOR (3 downto 0);-- TX DATA NIBBLE
         
         ethernet_tdp : out STD_LOGIC;
-        ethernet_tdm : out STD_LOGIC
+        ethernet_tdm : out STD_LOGIC;
+        
+        -- BUFFER IO
+        ib_valid : out STD_LOGIC;
+        ib_in : out STD_LOGIC_VECTOR(31 downto 0)
+        
     );
 end ethernet_tx;
 
