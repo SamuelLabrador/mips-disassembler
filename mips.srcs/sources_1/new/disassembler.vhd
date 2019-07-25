@@ -34,7 +34,7 @@ USE ieee.numeric_std.ALL;
 
 entity disassembler is
     Port (
-        clk_master : in STD_LOGIC;
+        CLK100MHZ : in STD_LOGIC;
         reset : in STD_LOGIC;
             
         -- ETHERNET BOARD IO
@@ -51,7 +51,9 @@ entity disassembler is
                    
         eth_tx_clk : in STD_LOGIC;                  -- TX REFERENCE CLOCK
         eth_tx_en : out STD_LOGIC;                  -- TX ENABLE
-        eth_txd : out STD_LOGIC_VECTOR (3 downto 0) -- TX DATA NIBBLE
+        eth_txd : out STD_LOGIC_VECTOR (3 downto 0); -- TX DATA NIBBLE
+        
+        eth_rxerr : in STD_LOGIC                    -- Error 
                    
     );
 end disassembler;
@@ -62,18 +64,18 @@ architecture Structural of disassembler is
     -- AXI BUS SIGNALS
     signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
     signal awaddr, araddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
-    signal wvalid, wready, arvalid, arready,  : STD_LOGIC;
-    
-    -- AXI DEAD SIGNALS
-    signal irpt, bready : STD_LOGIC; 
+    signal awvalid, awready, arvalid, arready, wvalid, wready, rvalid, rready, irpt, bready, bvalid : STD_LOGIC; 
+   
     signal wstrb : STD_LOGIC_VECTOR (3 downto 0);
-    signal bresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
+    signal bresp, rresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+
+    -- MDIO DEAD SIGNALS
+    signal mdio_i, mdio_o, mdio_t : STD_LOGIC;
 
     -- AXI
     component axi_ethernetlite_0 IS
       PORT (
-
-      	
         s_axi_aclk : IN STD_LOGIC;							-- Clock Source
         s_axi_aresetn : IN STD_LOGIC;						-- Global reset source, active-Low.
         ip2intc_irpt : OUT STD_LOGIC;						-- Interupt Signal
@@ -127,13 +129,13 @@ architecture Structural of disassembler is
     begin
     
     ethernet_module : axi_ethernetlite_0 port map(
-		s_axi_aclk => clk_master,
+		s_axi_aclk => CLK100MHZ,
 		s_axi_aresetn => reset,
 		ip2intc_irpt => irpt,		-- NOT USED IN DESIGN
-		s_axi_awaddr => waddr,
-		s_axi_awvalid => wvalid,
-		s_axi_awready => wready,
-		s_axi_wdata => din,
+		s_axi_awaddr => awaddr,
+		s_axi_awvalid => awvalid,
+		s_axi_awready => awready,
+		s_axi_wdata => wdata,
 		s_axi_wstrb => wstrb, 		-- NOT USED IN DESIGN
 		s_axi_wvalid => wvalid,
 		s_axi_wready => wready,
@@ -158,39 +160,28 @@ architecture Structural of disassembler is
 		
 		phy_col => eth_col,			-- DUPLEX COLLISION DETECTION
 		
-		phy_rx_er => eth_rx_er,
+		phy_rx_er => eth_rxerr,
 		phy_rst_n => eth_rstn,
 
 		phy_tx_en => eth_tx_en,
 		phy_tx_data => eth_txd,
 
 		-- NOT USING MDIO 
-		phy_mdio_i : IN STD_LOGIC;	
-		phy_mdio_o : OUT STD_LOGIC;
-		phy_mdio_t : OUT STD_LOGIC;
+		phy_mdio_i => mdio_i,	
+		phy_mdio_o => mdio_o,
+		phy_mdio_t => mdio_t,
 		
-		phy_mdc : OUT STD_LOGIC
+		phy_mdc => eth_mdc
     );
-        
---    input_buffer : fifo_generator_0 port map(
---        clk => clk_master,
---        srst => reset,
---        din => ib_din,
---        wr_en => ib_wr_en,
---        rd_en => ib_rd_en,
---        dout => ib_dout,
---        full => ib_full
---    );
-        
+
     -- WRITE TO INPUT BUFFER
-    process(clk_master)
+    process(CLK100MHZ)
         variable data : STD_LOGIC_VECTOR (31 downto 0);
     begin
         data := X"0F0F0F0F";
         
-        if rising_edge(clk_master) then
-            
-                
+        if rising_edge(CLK100MHZ) then
+                         
         end if;
     end process;
     
