@@ -33,6 +33,17 @@ USE ieee.numeric_std.ALL;
 --use UNISIM.VComponents.all;
 
 entity disassembler is
+
+    generic (
+        READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"0000";
+        WRITE_ADDR : STD_LOGIC_VECTOR (12 downto 0) :=  '0' & X"0000";
+        DEVICE_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"005E00FACE";
+        DESTINATION_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
+        
+        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"07F4";
+        TRANSMIT_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"07FC"
+    );
+    
     Port (
         CLK100MHZ : in STD_LOGIC;
         reset : in STD_LOGIC;
@@ -40,7 +51,6 @@ entity disassembler is
         -- ETHERNET BOARD IO
         eth_col : in STD_LOGIC;                     
         eth_crs : in STD_LOGIC;                     
-        eth_mdc : out STD_LOGIC;                    
                    
         eth_ref_clk : out STD_LOGIC;                -- MASTER REFERENCE CLOCK
         eth_rstn : out STD_LOGIC;                   -- RE-INITIALIZES THE ETHERNET CHIP. ASSERT LOW TO RESET.
@@ -53,25 +63,91 @@ entity disassembler is
         eth_tx_en : out STD_LOGIC;                  -- TX ENABLE
         eth_txd : out STD_LOGIC_VECTOR (3 downto 0); -- TX DATA NIBBLE
         
-        eth_rxerr : in STD_LOGIC                    -- Error 
+        eth_rxerr : in STD_LOGIC;                    -- Error 
                    
+        led : out STD_LOGIC_VECTOR (3 downto 0)
     );
 end disassembler;
 
 architecture Structural of disassembler is
 
-
     -- AXI BUS SIGNALS
     signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
     signal awaddr, araddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
     signal awvalid, awready, arvalid, arready, wvalid, wready, rvalid, rready, irpt, bready, bvalid : STD_LOGIC; 
-   
+
+
     signal wstrb : STD_LOGIC_VECTOR (3 downto 0);
     signal bresp, rresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
+    
+    signal init_flag : STD_LOGIC := '0';
+    
 
+    -- FUNCTIONS FOR BUS
 
-    -- MDIO DEAD SIGNALS
-    signal mdio_i, mdio_o, mdio_t : STD_LOGIC;
+    -- Set write address. 
+    -- Returns 1 if there was a transfer
+    -- Returns 0 if there was no transfer
+--    impure function write_address(
+--        address : STD_LOGIC_VECTOR (12 DOWNTO 0)
+--    )
+--    return STD_LOGIC is
+--    begin 
+--        if (awvalid = '0') then
+--            awvalid <= '1';                 -- SIGNAL THAT WE HAVE VALID DATA
+--            awaddr <= address;              -- SET WRITE ADDRESS
+--        elsif(awready = '1') then          -- WAIT FOR BUS TO BE READY
+--            awvalid <= '0';             -- DESSERT AWVALID DATA
+--            return '1';                 -- SUCCESSFUL TRANSER
+--        end if;
+--        return '0';                     -- DATA HAS NOT BEEN TRANSFERED YET
+--    end function;
+
+    -- Write data to pre-designated memory address
+    -- Returns 1 if there was a transfer
+    -- Returns 0 if there was no trasfer
+--    impure function write_data(
+--        data : STD_LOGIC_VECTOR (31 downto 0)
+--    )
+--    return STD_LOGIC is 
+--    begin
+--        if (wvalid = '-') then
+--            wvalid <= '1';
+--            wdata <= data;
+--        elsif(wread = '1') then
+--            wvalid <= '1';
+--            return '1';
+--        end if;
+
+--        return '0';
+--    end function;
+
+--    function read_address(
+--        address : STD_LOGIC_VECTOR (12 DOWNTO 0)
+--    )
+--    return STD_LOGIC is
+--    begin
+--        if (arvalid = '0') then
+--            arvalid <= '1';
+--            araddr <= address;
+--        elsif(arready = '1') then
+--            arvalid <= '0';
+--        end if;
+--    end function;
+
+    -- FUNCTION TO READ DATA
+--    function read_data
+--    return STD_LOGIC
+--    begin
+--        if (rready = '0') then
+--            rready <= '1';
+--        elsif (rvalid ='1') then
+--            rread <= '0';
+--            return '1';
+--        end if;
+--        return '0';
+         
+--    end function;
 
     -- AXI
     component axi_ethernetlite_0 IS
@@ -118,11 +194,7 @@ architecture Structural of disassembler is
         phy_rx_er : IN STD_LOGIC;
         phy_rst_n : OUT STD_LOGIC;
         phy_tx_en : OUT STD_LOGIC;
-        phy_tx_data : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
-        phy_mdio_i : IN STD_LOGIC;
-        phy_mdio_o : OUT STD_LOGIC;
-        phy_mdio_t : OUT STD_LOGIC;
-        phy_mdc : OUT STD_LOGIC
+        phy_tx_data : OUT STD_LOGIC_VECTOR(3 DOWNTO 0)
       );
     end component axi_ethernetlite_0;
     
@@ -164,25 +236,133 @@ architecture Structural of disassembler is
 		phy_rst_n => eth_rstn,
 
 		phy_tx_en => eth_tx_en,
-		phy_tx_data => eth_txd,
-
-		-- NOT USING MDIO 
-		phy_mdio_i => mdio_i,	
-		phy_mdio_o => mdio_o,
-		phy_mdio_t => mdio_t,
-		
-		phy_mdc => eth_mdc
+		phy_tx_data => eth_txd
     );
-
-    -- WRITE TO INPUT BUFFER
-    process(CLK100MHZ)
-        variable data : STD_LOGIC_VECTOR (31 downto 0);
-    begin
-        data := X"0F0F0F0F";
-        
+    
+    -- READ FROM INPUT BUFFER
+    receive : process(CLK100MHZ)
+        begin
+            
         if rising_edge(CLK100MHZ) then
-                         
+            -- Initial setup
+            if(init_flag = '0') then    
+                araddr <= READ_ADDR;
+                
+            elsif (rvalid = '1') then
+            
+                if (rready = '0') then
+                    
+                    rready <= '1';
+                    led <= rdata (3 downto 0);
+                else
+                    rready <= '0';
+                end if;
+            end if;
         end if;
+    end process;
+
+    -- SEND DATA OUT
+    transmit : process(CLK100MHZ) 
+        variable state : INTEGER := 0;
+        variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
+        variable transmit_register : STD_LOGIC_VECTOR (15 downto 0);
+        begin    
+            if rising_edge(CLK100MHZ) then
+                case state is 
+                
+                    -- PHASE 1 --
+                    -- SET ADDRESS TO WRITE DATA TO
+                    when 0 =>
+                        if (awvalid = '0') then         -- Write address
+                            awvalid <= '1';             -- SIGNAL THAT WE HAVE VALID DATA
+                            awaddr <= WRITE_ADDR;          -- SET WRITE ADDRESS
+                        elsif(awready = '1') then       -- WAIT FOR BUS TO BE READY
+                            awvalid <= '0';             -- DESSERT AWVALID DATA
+                            state := state + 1;
+                        end if;
+
+                    -- WRITE TRANSMIT DATA TO MEMORY
+                    when 1 =>
+                        if (wvalid = '0') then           -- Write Data
+                            wvalid <= '1';
+                            wdata <= data;
+                        elsif(wready = '1') then
+                            wvalid <= '1';
+                            state := state + 1;
+                        end if;
+                    
+                    -- PHASE 2 --
+                    -- SET ADDRESS TO WRITE DATA TO
+                    when 2 =>
+                        if (awvalid = '0') then
+                            awvalid <= '1';                 -- SIGNAL THAT WE HAVE VALID DATA
+                            awaddr <= SEND_DATA_LENGTH_ADDRESS;              -- SET WRITE ADDRESS
+                        elsif(awready = '1') then          -- WAIT FOR BUS TO BE READY
+                            awvalid <= '0';             -- DESSERT AWVALID DATA
+                            state := state + 1;
+                        end if;
+
+                    -- WRITE DATA LENGTH TO ADDRESS
+                    when 3 =>
+                        -- Send 4 bytes
+                        if (wvalid = '0') then           -- Write Data
+                            wvalid <= '1';
+                            wdata <= X"0004";
+                        elsif(wready = '1') then
+                            wvalid <= '0';
+                            state := state + 1;
+                        end if;
+
+                    -- PHASE 3 -- 
+                    when 4 =>
+                        if (awvalid = '0') then
+                            awvalid <= '1';                 -- SIGNAL THAT WE HAVE VALID DATA
+                            awaddr <= TRANSMIT_STATUS_ADDRESS;              -- SET WRITE ADDRESS
+                        elsif(awready = '1') then          -- WAIT FOR BUS TO BE READY
+                            awvalid <= '0';             -- DESSERT AWVALID DATA
+                            state := state + 1;
+                        end if;
+
+                    when 5 =>
+                        if (arvalid = '0') then
+                            arvalid <= '1';
+                            araddr <= TRANSMIT_STATUS_ADDRESS;
+                        elsif(arready = '1') then
+                            arvalid <= '0';
+                            state := state + 1;
+                        end if;
+
+                    when 6 => 
+                        if (rready = '0') then
+                            rready <= '1';
+                        elsif (rvalid ='1') then
+                            rready <= '0';
+                            transmit_register := rdata;
+                            state := state + 1;
+                        end if;
+
+                    when 7=>
+                        if (wvalid = '0') then
+                            wvalid <= '1';
+                            wdata <= (transmit_register or X"0001");
+                        elsif(wready = '1') then
+                            wvalid <= '1';
+                            state := state + 1;
+                        end if;
+
+                    -- PHASE 4 --
+                    -- WAIT FOR TRANSMIT TO FINISH
+                    when 8 =>
+                        if (rready = '0') then
+                            rready <= '1';
+                        elsif (rvalid ='1') then
+                            if (rdata(0) = '0') then 
+                                state := 0;
+                                rready <= '0';
+                            end if;
+                        end if;
+                end case;
+            end if;
     end process;
     
 end Structural;
