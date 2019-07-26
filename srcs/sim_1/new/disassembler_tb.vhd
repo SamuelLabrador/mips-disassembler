@@ -92,9 +92,38 @@ begin
     end process;
     
     process begin
-        r_reset <= '1';
-        wait for 300ns;
-        r_reset <= '0';
-        wait for 1 ms;
+        r_eth_rx_clk <= not r_eth_rx_clk;
+        r_eth_tx_clk <= not r_eth_tx_clk;
+        wait for 40 ns;
     end process;
+    
+    
+    process 
+        
+    begin
+        r_reset <= '0';
+        wait for 100 ns;
+          
+        r_reset <= '1';
+        
+        
+        wait for 5 ms;
+    end process;
+    
+    process
+        variable packet : STD_LOGIC_VECTOR (575  downto 0) := X"55555555555555D500005E00FACE54AB3AB5451108004500002EB3FE000080110518C0A8002CC0A8002C04000400001A2DC0000102030405060708090A0B0C0D0E0F101116E40376";
+        variable nibble : STD_LOGIC_VECTOR (3 downto 0);
+    begin
+        wait for 110 ns;
+        for nibble in 144 downto 1 loop
+            
+            r_eth_rxd <= packet (((nibble * 4) - 1) downto ((nibble - 1) * 4));
+            r_eth_rx_dv <= '1';
+            wait for 40 ns;
+            
+        end loop;
+        r_eth_rx_dv <= '0';
+        wait for 100 ns;   
+    end process;
+
 end Behavioral;

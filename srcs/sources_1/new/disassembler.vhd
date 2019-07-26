@@ -72,111 +72,130 @@ end disassembler;
 
 architecture Structural of disassembler is
 
+    -- CLOCK WIZARD SIGNALS
+    signal CLK25MHZ : STD_LOGIC := '0';
+    
     -- AXI BUS SIGNALS
     signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
     signal awaddr, araddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
-    signal awvalid, awready, arvalid, arready, wvalid, wready, rvalid, rready, irpt, bready, bvalid : STD_LOGIC; 
-
-
+    signal awvalid, awready, arvalid, arready, wvalid, wready, rvalid, rready, irpt, bready, bvalid : STD_LOGIC := '0'; 
+    
+    signal debug_state : INTEGER;
+    
+    
     signal wstrb : STD_LOGIC_VECTOR (3 downto 0);
     signal bresp, rresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
     
     signal init_flag : STD_LOGIC := '0';
-
+    
+    -- CLOCKING WIZARD
+    component clk_wiz_0_wrapper IS
+        PORT(
+            CLK25MHZ_0 : out STD_LOGIC;
+            clk_in1_0 : in STD_LOGIC
+        );
+    end component clk_wiz_0_wrapper;
+    
     -- AXI
-    component axi_ethernetlite_0 IS
+    component axi_ethernetlite_0_wrapper IS
       PORT (
-        s_axi_aclk : IN STD_LOGIC;							-- Clock Source
-        s_axi_aresetn : IN STD_LOGIC;						-- Global reset source, active-Low.
-        ip2intc_irpt : OUT STD_LOGIC;						-- Interupt Signal
+        s_axi_aclk_0 : IN STD_LOGIC;							-- Clock Source
+        s_axi_aresetn_0 : IN STD_LOGIC;						-- Global reset source, active-Low.
+        ip2intc_irpt_0 : OUT STD_LOGIC;						-- Interupt Signal
 
         -- Write Address Channel
-        s_axi_awaddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0);	-- Write address
-        s_axi_awvalid : IN STD_LOGIC;						-- Assert Write valid
-        s_axi_awready : OUT STD_LOGIC;						-- Write ready
+        S_AXI_0_awaddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0);	-- Write address
+        S_AXI_0_awvalid : IN STD_LOGIC;						-- Assert Write valid
+        S_AXI_0_awready : OUT STD_LOGIC;						-- Write ready
         
         -- Write Data Channel
-        s_axi_wdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);		-- Write Data
-        s_axi_wstrb : IN STD_LOGIC_VECTOR(3 DOWNTO 0);		-- Write Strobe
-        s_axi_wvalid : IN STD_LOGIC;						-- Write valide
-        s_axi_wready : OUT STD_LOGIC;						-- Write Ready
+        S_AXI_0_wdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);		-- Write Data
+        S_AXI_0_wstrb : IN STD_LOGIC_VECTOR(3 DOWNTO 0);		-- Write Strobe
+        S_AXI_0_wvalid : IN STD_LOGIC;						-- Write valide
+        S_AXI_0_wready : OUT STD_LOGIC;						-- Write Ready
        
         -- WRITE RESPONSE DATA CHANNEL
         -- DO NOT NEED TO USE IN DESIGN
-        s_axi_bresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);		-- Response
-        s_axi_bvalid : OUT STD_LOGIC;						-- Valid
-        s_axi_bready : IN STD_LOGIC;						-- Ready
+        S_AXI_0_bresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);		-- Response
+        S_AXI_0_bvalid : OUT STD_LOGIC;						-- Valid
+        S_AXI_0_bready : IN STD_LOGIC;						-- Ready
         
         -- Read Address Channel
-        s_axi_araddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0); 	-- Read Address
-        s_axi_arvalid : IN STD_LOGIC;						-- Read Valid
-        s_axi_arready : OUT STD_LOGIC;						-- Read Ready
+        S_AXI_0_araddr : IN STD_LOGIC_VECTOR(12 DOWNTO 0); 	-- Read Address
+        S_AXI_0_arvalid : IN STD_LOGIC;						-- Read Valid
+        S_AXI_0_arready : OUT STD_LOGIC;						-- Read Ready
         
         -- Read Data Channel
-        s_axi_rdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);	-- Read Data
-        s_axi_rresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);		-- Read Response Channel
-        s_axi_rvalid : OUT STD_LOGIC;						-- Read Valid
-        s_axi_rready : IN STD_LOGIC;						-- Read Ready
+        S_AXI_0_rdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);	-- Read Data
+        S_AXI_0_rresp : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);	-- Read Response Channel
+        S_AXI_0_rvalid : OUT STD_LOGIC;						-- Read Valid
+        S_AXI_0_rready : IN STD_LOGIC;						-- Read Ready
 
         -- PHYSICAL COMPONENTS
-        phy_tx_clk : IN STD_LOGIC;
-        phy_rx_clk : IN STD_LOGIC;
-        phy_crs : IN STD_LOGIC;
-        phy_dv : IN STD_LOGIC;
-        phy_rx_data : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
-        phy_col : IN STD_LOGIC;
-        phy_rx_er : IN STD_LOGIC;
-        phy_rst_n : OUT STD_LOGIC;
-        phy_tx_en : OUT STD_LOGIC;
-        phy_tx_data : OUT STD_LOGIC_VECTOR(3 DOWNTO 0)
+        MII_0_tx_clk : IN STD_LOGIC;
+        MII_0_rx_clk : IN STD_LOGIC;
+        MII_0_crs : IN STD_LOGIC;
+        MII_0_rx_dv : IN STD_LOGIC;
+        MII_0_rxd : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
+        MII_0_col : IN STD_LOGIC;
+        MII_0_rx_er : IN STD_LOGIC;
+        MII_0_rst_n : OUT STD_LOGIC;
+        MII_0_tx_en : OUT STD_LOGIC;
+        MII_0_txd : OUT STD_LOGIC_VECTOR(3 DOWNTO 0)
       );
-    end component axi_ethernetlite_0;
+    end component axi_ethernetlite_0_wrapper;
     
     begin
       
+    clk_wiz : clk_wiz_0_wrapper port map(
+       CLK25MHZ_0 => CLK25MHZ,
+       clk_in1_0 => CLK100MHZ
+    );
     
-    ethernet_module : axi_ethernetlite_0 port map(
-		s_axi_aclk => CLK100MHZ,
-		s_axi_aresetn => reset,
-		ip2intc_irpt => irpt,		-- NOT USED IN DESIGN
-		s_axi_awaddr => awaddr,
-		s_axi_awvalid => awvalid,
-		s_axi_awready => awready,
-		s_axi_wdata => wdata,
-		s_axi_wstrb => wstrb, 		-- NOT USED IN DESIGN
-		s_axi_wvalid => wvalid,
-		s_axi_wready => wready,
-		s_axi_bresp => bresp,		-- NOT USED IN DESIGN
-		s_axi_bvalid => bvalid,		-- NOT USED IN DESIGN
-		s_axi_bready => bready,
-		s_axi_araddr => araddr,
-		s_axi_arvalid => arvalid,
-		s_axi_arready => arready,
-		s_axi_rdata => rdata,
-		s_axi_rresp => rresp,
-		s_axi_rvalid => rvalid,
-		s_axi_rready => rready,
+    ethernet_module : axi_ethernetlite_0_wrapper port map(
+		s_axi_aclk_0 => CLK100MHZ,
+		s_axi_aresetn_0 => reset,
+		ip2intc_irpt_0 => irpt,		-- NOT USED IN DESIGN
+		S_AXI_0_awaddr => awaddr,
+		S_AXI_0_awvalid => awvalid,
+		S_AXI_0_awready => awready,
+		S_AXI_0_wdata => wdata,
+		S_AXI_0_wstrb => wstrb, 		-- NOT USED IN DESIGN
+		S_AXI_0_wvalid => wvalid,
+		S_AXI_0_wready => wready,
+		S_AXI_0_bresp => bresp,		-- NOT USED IN DESIGN
+		S_AXI_0_bvalid => bvalid,		-- NOT USED IN DESIGN
+		S_AXI_0_bready => bready,
+		S_AXI_0_araddr => araddr,
+		S_AXI_0_arvalid => arvalid,
+		S_AXI_0_arready => arready,
+		S_AXI_0_rdata => rdata,
+		S_AXI_0_rresp => rresp,
+		S_AXI_0_rvalid => rvalid,
+		S_AXI_0_rready => rready,
 
 		-- PHYSICAL DEVICE PORT MAP
-		phy_crs => eth_crs,
-		phy_rx_clk => eth_rx_clk,
-		phy_tx_clk => eth_tx_clk,
+		MII_0_crs => eth_crs,
+		MII_0_rx_clk => eth_rx_clk,
+		MII_0_tx_clk => eth_tx_clk,
 
-		phy_dv => eth_rx_dv,
-		phy_rx_data => eth_rxd,
+		MII_0_rx_dv => eth_rx_dv,
+		MII_0_rxd => eth_rxd,
 		
-		phy_col => eth_col,			-- DUPLEX COLLISION DETECTION
+		MII_0_col => eth_col,			-- DUPLEX COLLISION DETECTION
 		
-		phy_rx_er => eth_rxerr,
-		phy_rst_n => eth_rstn,
+		MII_0_rx_er => eth_rxerr,
+		MII_0_rst_n => eth_rstn,
 
-		phy_tx_en => eth_tx_en,
-		phy_tx_data => eth_txd
+		MII_0_tx_en => eth_tx_en,
+		MII_0_txd => eth_txd
     );
+    
+    eth_ref_clk <= CLK25MHZ;
     
     -- IGNORE THIS MODULE
     -- UNUSED SIGNALS
-    process(CLK100MHZ) 
+    process(CLK100MHZ, eth_rx_dv) 
         variable dead : STD_LOGIC := '0';
     begin
         if rising_edge(CLK100MHZ) then 
@@ -187,27 +206,42 @@ architecture Structural of disassembler is
         
     end process;
     
+    
+    
     -- SEND DATA OUT
-    transmit : process(CLK100MHZ, reset) 
+    ethernet_buffer_logic : process(CLK100MHZ, reset) 
         
         -- 0 Means Receive
         -- 1 Means Transmit
         variable mode: STD_LOGIC := '0';
+
         variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
         
         variable state : INTEGER := 0;
         variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
         variable config_register : STD_LOGIC_VECTOR (31 downto 0);
         
-    begin    
-        led <= std_logic_vector(to_unsigned(state + 1, 4));
-            if reset = '1' then 
+    begin
+        if (rising_edge(CLK100MHZ)) then   
+            
+            -- FOR DEBUGGING
+            debug_state <= state;
+            
+            led <= r_led;
+
+            -- RESET LOGIC
+            -- ACTIVE LOW!
+            if reset = '0' then
+                r_led := X"0"; 
                 state := 0;
+
+            -- CHECK FOR DATA TO RECEIVE
             elsif mode = '0' then
                 case state is
                     
                     -- SET READ ADDRESS
                     when 0 =>
+                        
                         if(arvalid /= '1') then
                             arvalid <= '1';
                             araddr <= RECEIVE_STATUS_ADDRESS;
@@ -216,21 +250,23 @@ architecture Structural of disassembler is
                             state := state + 1;
                         end if;
                         
-                    -- READ DATA FROM ADDRESS
+                    -- READ DATA FROM MEMORY
                     when 1 =>
+                    
                         if(rready /= '1') then
                             rready <= '1';
                         elsif (rvalid = '1') then 
                             rready <= '0';
                             config_register := rdata;
-                            -- DATA ON BUS
+                            
                             if (config_register(0) = '1') then
                                 state := state + 1;
-                                led <= X"1";
+                            else 
+                                state := state - 1;
                             end if;
                         end if;
                         
-                    -- SET READ DATA ADDRESS
+                    -- SET ADDRESS TO READ FROM
                     when 2 =>
                         if(arvalid /= '1') then
                             arvalid <= '1';
@@ -240,19 +276,20 @@ architecture Structural of disassembler is
                             state := state + 1;
                         end if;
                         
+                    -- READ PACKET DATA
                     when 3 =>
+                   
                         if(rready /= '1') then
                             rready <= '1';
                         elsif(rvalid = '1') then
-                            if(rdata = X"A0A0A0A0") then
-                                led <= X"F";
-                            elsif rdata = X"FFFF0000" then
-                                led <= X"A";
-                                mode := '1';
+                            r_led := X"F";
+                            rready <= '0';
+                            
                             state := state + 1;
-                            end if;
+                           
                         end if;
                         
+                   -- SET WRITE ADDRESS.. DONE COPYING DATA.
                    when 4 =>
                         if(awvalid /= '1') then
                             awvalid <= '1';
@@ -262,6 +299,7 @@ architecture Structural of disassembler is
                             state := state + 1;
                         end if;
                         
+                    -- WRITE 0 TO CONFIG REGISTER
                     when 5 =>
                         if(wvalid /= '1') then
                             wvalid <= '1';
@@ -272,7 +310,7 @@ architecture Structural of disassembler is
                         end if;
                         
                     when others =>
-                        state := 0;
+                        state := 6;
                 end case;
                 
             elsif mode = '1' then
@@ -281,7 +319,7 @@ architecture Structural of disassembler is
                     -- PHASE 1 --
                     -- SET ADDRESS TO WRITE DATA TO
                     when 0 =>
-                        if (awvalid = '0') then         -- Write address
+                        if (awvalid /= '1') then         -- Write address
                             awvalid <= '1';             -- SIGNAL THAT WE HAVE VALID DATA
                             awaddr <= WRITE_ADDR;          -- SET WRITE ADDRESS
                         elsif(awready = '1') then       -- WAIT FOR BUS TO BE READY
@@ -374,6 +412,7 @@ architecture Structural of disassembler is
                         state := 0;
                 end case;
             end if;
+        end if;
     end process;
     
 end Structural;

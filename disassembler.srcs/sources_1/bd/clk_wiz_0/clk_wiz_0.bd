@@ -1,0 +1,154 @@
+{
+  "design": {
+    "design_info": {
+      "boundary_crc": "0x39D4C9B84E70DA38",
+      "device": "xc7a35ticsg324-1L",
+      "name": "clk_wiz_0",
+      "synth_flow_mode": "Hierarchical",
+      "tool_version": "2019.1",
+      "validated": "true"
+    },
+    "design_tree": {
+      "clk_wiz_0": ""
+    },
+    "ports": {
+      "CLK25MHZ_0": {
+        "type": "clk",
+        "direction": "O",
+        "parameters": {
+          "CLK_DOMAIN": {
+            "value": "/clk_wiz_0_clk_out1",
+            "value_src": "ip_prop"
+          },
+          "FREQ_HZ": {
+            "value": "25000000"
+          },
+          "INSERT_VIP": {
+            "value": "0",
+            "value_src": "default"
+          },
+          "PHASE": {
+            "value": "0.0",
+            "value_src": "ip_prop"
+          }
+        }
+      },
+      "clk_in1_0": {
+        "type": "clk",
+        "direction": "I",
+        "parameters": {
+          "CLK_DOMAIN": {
+            "value": "clk_wiz_0_clk_in1_0",
+            "value_src": "default"
+          },
+          "FREQ_HZ": {
+            "value": "100000000",
+            "value_src": "default"
+          },
+          "INSERT_VIP": {
+            "value": "0",
+            "value_src": "default"
+          },
+          "PHASE": {
+            "value": "0.000",
+            "value_src": "default"
+          }
+        }
+      }
+    },
+    "components": {
+      "clk_wiz_0": {
+        "vlnv": "xilinx.com:ip:clk_wiz:6.0",
+        "xci_name": "clk_wiz_0_clk_wiz_0_0",
+        "parameters": {
+          "CLKOUT1_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLKOUT1_JITTER": {
+            "value": "181.828"
+          },
+          "CLKOUT1_PHASE_ERROR": {
+            "value": "104.359"
+          },
+          "CLKOUT1_REQUESTED_OUT_FREQ": {
+            "value": "25"
+          },
+          "CLKOUT2_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLKOUT3_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLKOUT4_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLKOUT5_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLKOUT6_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLKOUT7_DRIVES": {
+            "value": "BUFG"
+          },
+          "CLK_OUT1_PORT": {
+            "value": "CLK25MHZ"
+          },
+          "FEEDBACK_SOURCE": {
+            "value": "FDBK_AUTO"
+          },
+          "MMCM_BANDWIDTH": {
+            "value": "OPTIMIZED"
+          },
+          "MMCM_CLKFBOUT_MULT_F": {
+            "value": "9.125"
+          },
+          "MMCM_CLKOUT0_DIVIDE_F": {
+            "value": "36.500"
+          },
+          "MMCM_COMPENSATION": {
+            "value": "ZHOLD"
+          },
+          "MMCM_DIVCLK_DIVIDE": {
+            "value": "1"
+          },
+          "OVERRIDE_MMCM": {
+            "value": "false"
+          },
+          "PRIMITIVE": {
+            "value": "MMCM"
+          },
+          "PRIM_SOURCE": {
+            "value": "Single_ended_clock_capable_pin"
+          },
+          "RESET_PORT": {
+            "value": "reset"
+          },
+          "RESET_TYPE": {
+            "value": "ACTIVE_HIGH"
+          },
+          "USE_LOCKED": {
+            "value": "false"
+          },
+          "USE_RESET": {
+            "value": "false"
+          }
+        }
+      }
+    },
+    "nets": {
+      "clk_wiz_0_CLK25MHZ": {
+        "ports": [
+          "clk_wiz_0/CLK25MHZ",
+          "CLK25MHZ_0"
+        ]
+      },
+      "clk_in1_0_1": {
+        "ports": [
+          "clk_in1_0",
+          "clk_wiz_0/clk_in1"
+        ]
+      }
+    }
+  }
+}
