@@ -37,11 +37,37 @@ entity disassembler is
     generic (
         READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"000";
         WRITE_ADDR : STD_LOGIC_VECTOR (12 downto 0) :=  '0' & X"000";
+        
+        -- MAC ADDRESS
         DEVICE_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) :=      X"00005E00FACE";
         DESTINATION_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
         
-        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7F4";
+        -- TX LENGTH REGISTER
+        -- [31:16]  RESERVED
+        -- [15:8]   MSB -- The Higher 8 bits of the frame length
+        -- [7:0]    LSB -- The Lower 8 bits of the frame length
+        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7F4" 
+        
+        -- TX CONTROL REGISTER (Ping)
+        -- [31:5]   RESERVED
+        -- [4]      LOOPBACK (0 = disable , 1 = enable)
+        -- [3]      INTERRUPT ENABLE (0 = disable, 1 = enable)
+        -- [2]      RESERVED
+        -- [1]      PROGRAM MAC ADDRESS 
+        -- [0]      STATUS (
+        --              0 = Transmit ping buffer is ready to accept new frame.
+        --              1 = Frame Transfer in progress.
+        --          )
         TRANSMIT_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7FC";
+        
+        -- RECEIVE CONTROL REGISTER (Ping)
+        -- [31:4]   RESERVED
+        -- [3]      INTERRUPT ENABLE (0 = disable, 1 = enable)
+        -- [2:1]    RESERVED
+        -- [0]      STATUS (
+        --              0 = Receive ping buffer is empty. Can accept new valid packet.
+        --              1 = Presnse of receive packet ready for software processing.
+        --          )
         RECEIVE_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"7FC"
     );
     
