@@ -59,7 +59,7 @@ architecture Behavioral of disassembler_tb is
             
             eth_rxerr : in STD_LOGIC;                    -- Error 
             
-            led : out STD_LOGIC_VECTOR (3 downto 0)      -- FOr debugging
+            led : out STD_LOGIC_VECTOR (3 downto 0)      -- For debugging
         );
     end component disassembler;
     
@@ -67,6 +67,7 @@ architecture Behavioral of disassembler_tb is
     signal r_clk, r_reset, r_eth_col, r_eth_crs, r_eth_mdc, r_eth_ref_clk, r_eth_rstn, r_eth_rx_clk, eth_rx_dv, eth_rxd, r_eth_rx_dv, r_eth_tx_clk, r_eth_tx_en, r_eth_rxerr : STD_LOGIC := '0';
     signal r_led, r_eth_rxd, r_eth_txd : STD_LOGIC_VECTOR (3 downto 0);
     
+    signal counter : INTEGER := 144;
 begin
 
     UUT : disassembler port map(
@@ -86,44 +87,52 @@ begin
         led => r_led
     );
     
-    process begin
+    -- 100 MHZ clock generation
+    master_clock : process begin
         r_clk <= not r_clk;
         wait for 5 ns;
     end process;
+   
     
-    process begin
+    -- 25 MHZ clock generation
+    PHY_CLK : process begin
+        r_eth_ref_clk <= not r_eth_ref_clk;
         r_eth_rx_clk <= not r_eth_rx_clk;
         r_eth_tx_clk <= not r_eth_tx_clk;
-        wait for 40 ns;
+        wait for 20 ns;
     end process;
     
-    
-    process 
-        
-    begin
+    RESET_GENERATION : process begin
+        wait for 25 ns;
         r_reset <= '0';
-        wait for 100 ns;
-          
+        wait for 50 ns;
         r_reset <= '1';
-        
-        
-        wait for 5 ms;
+        wait;
     end process;
     
-    process
+    
+    send_packet : process (r_eth_rx_clk, r_reset)
         variable packet : STD_LOGIC_VECTOR (575  downto 0) := X"55555555555555D500005E00FACE54AB3AB5451108004500002EB3FE000080110518C0A8002CC0A8002C04000400001A2DC0000102030405060708090A0B0C0D0E0F101116E40376";
-        variable nibble : STD_LOGIC_VECTOR (3 downto 0);
     begin
-        wait for 110 ns;
-        for nibble in 144 downto 1 loop
+        
+        if rising_edge(r_eth_rx_clk) then
+        
+            -- ACTIVE LOW
+            if r_reset = '0' then
+                counter <= 144;
             
-            r_eth_rxd <= packet (((nibble * 4) - 1) downto ((nibble - 1) * 4));
-            r_eth_rx_dv <= '1';
-            wait for 40 ns;
-            
-        end loop;
-        r_eth_rx_dv <= '0';
-        wait for 100 ns;   
+            else 
+                if counter = 0 then
+                    r_eth_rx_dv <= '0';
+                
+                else
+                    r_eth_rx_dv <= '1';
+                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
+                    counter <= counter - 1;
+                end if;
+            end if;
+        end if;
     end process;
+    
 
 end Behavioral;
