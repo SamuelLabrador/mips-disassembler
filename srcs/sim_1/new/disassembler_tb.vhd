@@ -112,14 +112,14 @@ begin
     
     
     send_packet : process (r_eth_rx_clk, r_reset)
-        variable packet : STD_LOGIC_VECTOR (575  downto 0) := X"55555555555555D500005E00FACE54AB3AB5451108004500002EB3FE000080110518C0A8002CC0A8002C04000400001A2DC0000102030405060708090A0B0C0D0E0F101116E40376";
+        variable packet : STD_LOGIC_VECTOR (783  downto 0) := X"00005e00facefeedfacebeef080045000054059f400040012f930a00020fc358361008002b4511220002a9f45c5300000000f57b010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637";
     begin
         
         if rising_edge(r_eth_rx_clk) then
-        
+            
             -- ACTIVE LOW
             if r_reset = '0' then
-                counter <= 144;
+                counter <= 196;
             
             else 
                 if counter = 0 then
@@ -127,7 +127,8 @@ begin
                 
                 else
                     r_eth_rx_dv <= '1';
-                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
+                    r_eth_rxd <= packet (((counter * 4) - 1) downto ((counter - 1) * 4));
+--                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
                     counter <= counter - 1;
                 end if;
             end if;

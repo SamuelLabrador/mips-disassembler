@@ -46,7 +46,7 @@ entity disassembler is
         -- [31:16]  RESERVED
         -- [15:8]   MSB -- The Higher 8 bits of the frame length
         -- [7:0]    LSB -- The Lower 8 bits of the frame length
-        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7F4" 
+        SEND_DATA_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7F4";
         
         -- TX CONTROL REGISTER (Ping)
         -- [31:5]   RESERVED
@@ -105,9 +105,6 @@ architecture Structural of disassembler is
     signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
     signal awaddr, araddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
     signal awvalid, awready, arvalid, arready, wvalid, wready, rvalid, rready, irpt, bready, bvalid : STD_LOGIC := '0'; 
-    
-    signal debug_state : INTEGER;
-    
     
     signal wstrb : STD_LOGIC_VECTOR (3 downto 0);
     signal bresp, rresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
@@ -278,20 +275,7 @@ architecture Structural of disassembler is
     
 --    core_start <= '1';
     eth_ref_clk <= CLK25MHZ;
-    
-    -- IGNORE THIS MODULE
-    -- UNUSED SIGNALS
-    process(CLK100MHZ, eth_rx_dv) 
-        variable dead : STD_LOGIC := '0';
-    begin
-        if rising_edge(CLK100MHZ) then 
-            bready <= '0';
-            dead := bvalid;
-            wstrb <= X"0";
-        end if;
-        
-    end process;
-    
+
     -- SEND DATA OUT
     ethernet_buffer_logic : process(CLK100MHZ, reset) 
         
@@ -303,29 +287,30 @@ architecture Structural of disassembler is
         
         variable state : INTEGER := 0;
         variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
-        variable config_register : STD_LOGIC_VECTOR (31 downto 0);
+        variable receive_control_register, transmit_control_register : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
         
     begin
+    
         if (rising_edge(CLK100MHZ)) then   
-            
+        
             -- FOR DEBUGGING
-            debug_state <= state;
             led <= r_led;
 
             -- RESET LOGIC
             -- ACTIVE LOW!
             if reset = '0' then
-                r_led := X"0"; 
-                state := 0;
+                arvalid <= '0';
+                wstrb <= X"0";
+                
+                
+--                r_led := X"0"; 
+                state := 4;
 
             -- CHECK FOR DATA TO RECEIVE
             elsif mode = '0' then
                 case state is
-                    
                     -- SET READ ADDRESS
                     when 0 =>
-                        r_led := r_led or X"1";
-                        
                         if(arvalid /= '1') then
                             arvalid <= '1';
                             araddr <= RECEIVE_STATUS_ADDRESS;
@@ -336,14 +321,14 @@ architecture Structural of disassembler is
                         
                     -- READ DATA FROM MEMORY
                     when 1 =>
-                        r_led := r_led or X"2";
                         if(rready /= '1') then
                             rready <= '1';
                         elsif (rvalid = '1') then 
                             rready <= '0';
-                            config_register := rdata;
+                            receive_control_register := rdata;
                             
-                            if (config_register(0) = '1') then
+                            if (receive_control_register(0) = '1') then
+--                                r_led := r_led xor X"1";
                                 state := state + 1;
                             else 
                                 state := state - 1;
@@ -352,49 +337,54 @@ architecture Structural of disassembler is
                         
                     -- SET ADDRESS TO READ FROM
                     when 2 =>
-                        r_led := r_led or X"4";
+                    
                         if(arvalid /= '1') then
                             arvalid <= '1';
                             araddr <= READ_ADDR;
                         elsif(arready = '1') then
-                            arvalid <= '1';
+                            arvalid <= '0';
                             state := state + 1;
                         end if;
                         
                     -- READ PACKET DATA
                     when 3 =>
-                        r_led := r_led or X"4";
+                        
                         if(rready /= '1') then
                             rready <= '1';
                         elsif(rvalid = '1') then
                             rready <= '0';
-                            
---                            state := state + 1;
-                           
-                        end if;
-                        
-                   -- SET WRITE ADDRESS.. DONE COPYING DATA.
-                   when 4 =>
-                        if(awvalid /= '1') then
-                            awvalid <= '1';
-                            awaddr <= RECEIVE_STATUS_ADDRESS;
-                        elsif (awready = '1') then
-                            awvalid <= '0';
                             state := state + 1;
                         end if;
                         
-                    -- WRITE 0 TO CONFIG REGISTER
-                    when 5 =>
-                        if(wvalid /= '1') then
+                    -- RESET THE RECEIVE MODE.
+                    when 4 =>
+                        if(awvalid /= '1' or wvalid /= '1' or bready /= '1') then
+                            awvalid <= '1';
                             wvalid <= '1';
-                            wdata <= config_register and X"FFFFFFFE";
-                        elsif (wready = '1') then
+                            bready <= '1';
+                            
+                            wstrb <= X"F";
+                            awaddr <= RECEIVE_STATUS_ADDRESS;
+                            wdata <= receive_control_register and X"FFFFFFFE";
+                        
+                        elsif (wready = '1' or awready = '1') then
+--                            r_led := r_led or X"8";
+                            awvalid <= '0';
                             wvalid <= '0';
-                            state := 0;
+                            state := state + 1;
+                        
                         end if;
                         
+                    when 5 =>
+                        
+                        if (bvalid = '1') then 
+                            r_led := not r_led;
+                            bready <= '0';
+                            state := 0;
+                        end if;
                     when others =>
-                        state := 6;
+                        state := 0;
+                        
                 end case;
                 
             elsif mode = '1' then
@@ -446,10 +436,10 @@ architecture Structural of disassembler is
                     -- PHASE 3 -- 
                     when 4 =>
                         if (awvalid = '0') then
-                            awvalid <= '1';                 -- SIGNAL THAT WE HAVE VALID DATA
-                            awaddr <= TRANSMIT_STATUS_ADDRESS;              -- SET WRITE ADDRESS
-                        elsif(awready = '1') then          -- WAIT FOR BUS TO BE READY
-                            awvalid <= '0';             -- DESSERT AWVALID DATA
+                            awvalid <= '1';                         -- SIGNAL THAT WE HAVE VALID DATA
+                            awaddr <= TRANSMIT_STATUS_ADDRESS;      -- SET WRITE ADDRESS
+                        elsif(awready = '1') then                   -- WAIT FOR BUS TO BE READY
+                            awvalid <= '0';                         -- DESSERT AWVALID DATA
                             state := state + 1;
                         end if;
 
@@ -467,14 +457,14 @@ architecture Structural of disassembler is
                             rready <= '1';
                         elsif (rvalid ='1') then
                             rready <= '0';
-                            config_register := rdata;
+                            transmit_control_register := rdata;
                             state := state + 1;
                         end if;
 
                     when 7=>
                         if (wvalid = '0') then
                             wvalid <= '1';
-                            wdata <= (config_register or X"00000001");
+                            wdata <= (transmit_control_register or X"00000001");
                         elsif(wready = '1') then
                             wvalid <= '1';
                             state := state + 1;

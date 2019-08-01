@@ -1,10 +1,10 @@
-// Copyright 1986-2018 Xilinx, Inc. All Rights Reserved.
+// Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
 // --------------------------------------------------------------------------------
-// Tool Version: Vivado v.2018.2 (win64) Build 2258646 Thu Jun 14 20:03:12 MDT 2018
-// Date        : Sat Jul 27 07:49:37 2019
-// Host        : DESKTOP-SIJ7D8T running 64-bit major release  (build 9200)
-// Command     : write_verilog -force -mode funcsim
-//               c:/Users/samla/Desktop/disassembler/disassembler.srcs/sources_1/ip/clk_wiz_0/clk_wiz_0_sim_netlist.v
+// Tool Version: Vivado v.2019.1 (win64) Build 2552052 Fri May 24 14:49:42 MDT 2019
+// Date        : Thu Aug  1 08:55:21 2019
+// Host        : DESKTOP-EDURT6F running 64-bit major release  (build 9200)
+// Command     : write_verilog -force -mode funcsim {C:/Users/Samuel L
+//               Jackson/Desktop/disassembler/disassembler.srcs/sources_1/ip/clk_wiz_0/clk_wiz_0_sim_netlist.v}
 // Design      : clk_wiz_0
 // Purpose     : This verilog netlist is a functional simulation representation of the design and should not be modified
 //               or synthesized. This netlist cannot be used for SDF annotated simulation.
