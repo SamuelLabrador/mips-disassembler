@@ -300,10 +300,6 @@ architecture Structural of disassembler is
             -- ACTIVE LOW!
             if reset = '0' then
                 arvalid <= '0';
-                wstrb <= X"0";
-                
-                
---                r_led := X"0"; 
                 state := 4;
 
             -- CHECK FOR DATA TO RECEIVE
@@ -328,7 +324,8 @@ architecture Structural of disassembler is
                             receive_control_register := rdata;
                             
                             if (receive_control_register(0) = '1') then
---                                r_led := r_led xor X"1";
+                            
+                                r_led := r_led xor X"F";
                                 state := state + 1;
                             else 
                                 state := state - 1;
@@ -359,6 +356,10 @@ architecture Structural of disassembler is
                     -- RESET THE RECEIVE MODE.
                     when 4 =>
                         if(awvalid /= '1' or wvalid /= '1' or bready /= '1') then
+                            arvalid <= '0';
+                            rready <= '0';
+                            
+                            
                             awvalid <= '1';
                             wvalid <= '1';
                             bready <= '1';
@@ -368,7 +369,6 @@ architecture Structural of disassembler is
                             wdata <= receive_control_register and X"FFFFFFFE";
                         
                         elsif (wready = '1' or awready = '1') then
---                            r_led := r_led or X"8";
                             awvalid <= '0';
                             wvalid <= '0';
                             state := state + 1;
@@ -378,10 +378,11 @@ architecture Structural of disassembler is
                     when 5 =>
                         
                         if (bvalid = '1') then 
-                            r_led := not r_led;
                             bready <= '0';
+                            wstrb <= X"0";
                             state := 0;
                         end if;
+                        
                     when others =>
                         state := 0;
                         
