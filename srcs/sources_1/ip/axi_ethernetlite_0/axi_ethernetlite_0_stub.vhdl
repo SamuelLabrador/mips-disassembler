@@ -1,7 +1,7 @@
 -- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
 -- --------------------------------------------------------------------------------
 -- Tool Version: Vivado v.2019.1 (win64) Build 2552052 Fri May 24 14:49:42 MDT 2019
--- Date        : Fri Jul 26 08:57:47 2019
+-- Date        : Thu Aug  1 16:01:52 2019
 -- Host        : DESKTOP-EDURT6F running 64-bit major release  (build 9200)
 -- Command     : write_vhdl -force -mode synth_stub {C:/Users/Samuel L
 --               Jackson/Desktop/disassembler/srcs/sources_1/ip/axi_ethernetlite_0/axi_ethernetlite_0_stub.vhdl}

@@ -35,13 +35,28 @@ USE ieee.numeric_std.ALL;
 entity disassembler is
 
     generic (
+        RECEIVE_MODE : STD_LOGIC := '0';
+        TRANSMIT_MODE : STD_LOGIC := '1';
+        
+        RECEIVE_RESET_STATE : INTEGER := 4;
+        TRANSMIT_RESET_STATE : INTEGER := 0;
+        
+        IPV4_DST_START : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"111";
+
+        UDP_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"111";
+
         READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"000";
         WRITE_ADDR : STD_LOGIC_VECTOR (12 downto 0) :=  '0' & X"000";
         
-        -- MAC ADDRESS
-        DEVICE_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) :=      X"00005E00FACE";
-        DESTINATION_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
-        
+        -- NETWORKING INFO
+        FPGA_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";
+        FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
+
+        DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
+        DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
+        DESITNATION_PORT : INTEGER := 2000;
+
+
         -- TX LENGTH REGISTER
         -- [31:16]  RESERVED
         -- [15:8]   MSB -- The Higher 8 bits of the frame length
@@ -68,7 +83,7 @@ entity disassembler is
         --              0 = Receive ping buffer is empty. Can accept new valid packet.
         --              1 = Presnse of receive packet ready for software processing.
         --          )
-        RECEIVE_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"7FC"
+        RECEIVE_CONTROL_REGISTER_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"7FC"
     );
     
     Port (
@@ -167,34 +182,9 @@ architecture Structural of disassembler is
         phy_tx_data : OUT STD_LOGIC_VECTOR(3 DOWNTO 0)
       );
     end component axi_ethernetlite_0;
-    
---    component axi_traffic_gen_0 IS
---        PORT(
---            s_axi_aclk : in STD_LOGIC;
---            s_axi_aresetn : in STD_LOGIC;
---            core_ext_start : in STD_LOGIC;
---            core_ext_stop : in STD_LOGIC;
---            m_axi_arid : out STD_LOGIC_VECTOR ( 0 to 0 );
---            m_axi_araddr : out STD_LOGIC_VECTOR ( 31 downto 0 );
---            m_axi_arlen : out STD_LOGIC_VECTOR ( 7 downto 0 );
---            m_axi_arsize : out STD_LOGIC_VECTOR ( 2 downto 0 );
---            m_axi_arburst : out STD_LOGIC_VECTOR ( 1 downto 0 );
---            m_axi_arlock : out STD_LOGIC_VECTOR ( 0 to 0 );
---            m_axi_arcache : out STD_LOGIC_VECTOR ( 3 downto 0 );
---            m_axi_arprot : out STD_LOGIC_VECTOR ( 2 downto 0 );
---            m_axi_arqos : out STD_LOGIC_VECTOR ( 3 downto 0 );
---            m_axi_aruser : out STD_LOGIC_VECTOR ( 7 downto 0 );
---            m_axi_arvalid : out STD_LOGIC;
---            m_axi_arready : in STD_LOGIC;
---            m_axi_rid : in STD_LOGIC_VECTOR ( 0 to 0 );
---            m_axi_rlast : in STD_LOGIC;
---            m_axi_rdata : in STD_LOGIC_VECTOR ( 31 downto 0 );
---            m_axi_rresp : in STD_LOGIC_VECTOR ( 1 downto 0 );
---            m_axi_rvalid : in STD_LOGIC;
---            m_axi_rready : out STD_LOGIC
---        );
---    end component axi_traffic_gen_0;
-    
+
+    function convert_to_vector()
+
     -- TEST MODULES
     signal arid, arlock, rid : STD_LOGIC_VECTOR (0 downto 0) := "0";
     signal core_start, core_stop, awid, awlock, wlast, bid, rlast : STD_LOGIC := '0';
@@ -281,17 +271,17 @@ architecture Structural of disassembler is
         
         -- 0 Means Receive
         -- 1 Means Transmit
-        variable mode: STD_LOGIC := '0';
+        variable ethernet_mode: STD_LOGIC := '0';
 
         variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
         
-        variable state : INTEGER := 0;
+        variable receive_state, state, receive_read_address, transmit_read_address : INTEGER := 0;
         variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
         variable receive_control_register, transmit_control_register : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
         
     begin
     
-        if (rising_edge(CLK100MHZ)) then   
+        if rising_edge(CLK100MHZ) then   
         
             -- FOR DEBUGGING
             led <= r_led;
@@ -299,96 +289,98 @@ architecture Structural of disassembler is
             -- RESET LOGIC
             -- ACTIVE LOW!
             if reset = '0' then
-                arvalid <= '0';
-                state := 4;
+                awaddr = '0' & X"000";
+                awvalid = '0';
+                wdata = X"0000";
+                wstrb = X"0";
+                wvalid = '0';
+                bready = '0';
+                araddr = '0' & X"000";
+                arvalid = '0';
+                rready = '0';
+                receive_state = 0;
+                state = 0;
+                ethernet_mode = '0';
 
-            -- CHECK FOR DATA TO RECEIVE
-            elsif mode = '0' then
-                case state is
+            -- RECEIVE SUB PROCESS
+            elsif ethernet_mode = RECEIVE_MODE then
+                case receive_state is
                     -- SET READ ADDRESS
-                    when 0 =>
-                        if(arvalid /= '1') then
+                    when 0 => 
+                        if arready = '0' then 
                             arvalid <= '1';
-                            araddr <= RECEIVE_STATUS_ADDRESS;
-                        elsif (arready = '1') then
-                            arvalid <= '0';
-                            state := state + 1;
-                        end if;
-                        
-                    -- READ DATA FROM MEMORY
-                    when 1 =>
-                        if(rready /= '1') then
                             rready <= '1';
-                        elsif (rvalid = '1') then 
-                            rready <= '0';
-                            receive_control_register := rdata;
-                            
-                            if (receive_control_register(0) = '1') then
-                            
-                                r_led := r_led xor X"F";
-                                state := state + 1;
-                            else 
-                                state := state - 1;
+                            raddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                        elsif arready = '1' then =>
+                            arvalid <= '0';
+                            receive_state := receive_state + 1;
+                        end if;
+                    -- CHECK READ DATA
+                    when 1 =>                  
+                        if rvalid = '1' then
+                            rready <= '1';
+                            arvalid <= '1';                                
+                            if rdata(0) = '1' then
+                                receive_state := receive_state + 1;
+                                raddr <= IPV4_DST_START_ADDRESS;
+                            else
+                                receive_state := receive_state - 1;
+                                raddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
                             end if;
                         end if;
-                        
-                    -- SET ADDRESS TO READ FROM
-                    when 2 =>
                     
-                        if(arvalid /= '1') then
-                            arvalid <= '1';
-                            araddr <= READ_ADDR;
-                        elsif(arready = '1') then
+                    when 2 =>    
+                        if arready = '1' then
                             arvalid <= '0';
-                            state := state + 1;
+                            receive_state := receive_state + 1;
                         end if;
-                        
-                    -- READ PACKET DATA
+                    -- GET UPPER 2 BYTES OF IPV4 DEST ADDRESS
+
                     when 3 =>
-                        
-                        if(rready /= '1') then
+                        if rvalid = '1' then
+                            ip_destination (31 downto 16) := rdata (15 downto 0);
+                            raddr <= std_logic_vector( unsigned(IPV4_DST_START_ADDRESS) + 1 );
+                            arvalid <= '1';
                             rready <= '1';
-                        elsif(rvalid = '1') then
-                            rready <= '0';
-                            state := state + 1;
+                            receive_state := receive_state + 1;
+
                         end if;
-                        
-                    -- RESET THE RECEIVE MODE.
+                    
                     when 4 =>
-                        if(awvalid /= '1' or wvalid /= '1' or bready /= '1') then
+                        if arready = '1' then
                             arvalid <= '0';
-                            rready <= '0';
-                            
-                            
-                            awvalid <= '1';
-                            wvalid <= '1';
-                            bready <= '1';
-                            
-                            wstrb <= X"F";
-                            awaddr <= RECEIVE_STATUS_ADDRESS;
-                            wdata <= receive_control_register and X"FFFFFFFE";
-                        
-                        elsif (wready = '1' or awready = '1') then
-                            awvalid <= '0';
-                            wvalid <= '0';
-                            state := state + 1;
-                        
+                            receive_state := receive_state + 1;
                         end if;
-                        
+
+                    -- GET LOWER 2 BYTES OF IPV4 DEST ADDRESS
                     when 5 =>
-                        
-                        if (bvalid = '1') then 
-                            bready <= '0';
-                            wstrb <= X"0";
-                            state := 0;
+                        if rvalid = '1' then
+                            rready <= '0'
+                            ip_destination (15 downto 0) := rdata (31 downto 16);
+
+                            -- CHECK IF PACKET IS FOR FPGA
+                            if ip_destination = FPGA_IPV4_ADDRESS then
+                                state := state + 1;
+                                arvalid <= '1';
+                                rready <= '1';
+                                raddr <= UDP_LENGTH_ADDRESS;
+                            else 
+                                state := RECEIVE_RESET_STATE;
+                                awvalid <= '1';
+                                wvalid <= '1';
+                                bready <= '1';
+                                wstrb <= X"F";
+                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                wdata <= receive_control_register and X"FFFE";
+                            end if;
                         end if;
+
+                    when 6 => 
                         
                     when others =>
-                        state := 0;
-                        
+
                 end case;
-                
-            elsif mode = '1' then
+            elsif ethernet_mode = TRANSMIT_MODE then
                 case state is 
                 
                     -- PHASE 1 --
@@ -489,5 +481,7 @@ architecture Structural of disassembler is
             end if;
         end if;
     end process;
+
+
     
 end Structural;
