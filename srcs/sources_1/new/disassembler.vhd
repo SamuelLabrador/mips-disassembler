@@ -238,32 +238,9 @@ architecture Structural of disassembler is
 		phy_tx_en => eth_tx_en,
 		phy_tx_data => eth_txd
     );
---    traffic_generator : axi_traffic_gen_0 port map(
---        s_axi_aclk => CLK100MHZ,
---        s_axi_aresetn => reset,
---        core_ext_start => core_start,
---        core_ext_stop => core_stop,
---        m_axi_arid => arid,
---        m_axi_araddr => rdata,
---        m_axi_arlen => arlen,
---        m_axi_arsize => arsize,
---        m_axi_arburst => arburst,
---        m_axi_arlock => arlock,
---        m_axi_arcache => arcache,
---        m_axi_arprot => arprot,
---        m_axi_arqos => arquos,
---        m_axi_aruser => aruser,
---        m_axi_arvalid => arvalid,
---        m_axi_arready => arready,
---        m_axi_rid => rid,
---        m_axi_rlast => rlast,
---        m_axi_rdata => rdata,
---        m_axi_rresp => rresp,
---        m_axi_rvalid => rvalid,
---        m_axi_rready => rready
---    );
+
     
---    core_start <= '1';
+    -- DIRECT 25MHZ CLOCK to ETH_PHY_CLK
     eth_ref_clk <= CLK25MHZ;
 
     -- SEND DATA OUT
@@ -376,107 +353,84 @@ architecture Structural of disassembler is
                         end if;
 
                     when 6 => 
-                        
-                    when others =>
-
-                end case;
-            elsif ethernet_mode = TRANSMIT_MODE then
-                case state is 
-                
-                    -- PHASE 1 --
-                    -- SET ADDRESS TO WRITE DATA TO
-                    when 0 =>
-                        if (awvalid /= '1') then         -- Write address
-                            awvalid <= '1';             -- SIGNAL THAT WE HAVE VALID DATA
-                            awaddr <= WRITE_ADDR;          -- SET WRITE ADDRESS
-                        elsif(awready = '1') then       -- WAIT FOR BUS TO BE READY
-                            awvalid <= '0';             -- DESSERT AWVALID DATA
-                            state := state + 1;
-                        end if;
-
-                    -- WRITE TRANSMIT DATA TO MEMORY
-                    when 1 =>
-                        if (wvalid = '0') then           -- Write Data
-                            wvalid <= '1';
-                            wdata <= data;
-                        elsif(wready = '1') then
-                            wvalid <= '1';
-                            state := state + 1;
-                        end if;
-                    
-                    -- PHASE 2 --
-                    -- SET ADDRESS TO WRITE DATA TO
-                    when 2 =>
-                        if (awvalid = '0') then
-                            awvalid <= '1';                 -- SIGNAL THAT WE HAVE VALID DATA
-                            awaddr <= SEND_DATA_LENGTH_ADDRESS;              -- SET WRITE ADDRESS
-                        elsif(awready = '1') then          -- WAIT FOR BUS TO BE READY
-                            awvalid <= '0';             -- DESSERT AWVALID DATA
-                            state := state + 1;
-                        end if;
-
-                    -- WRITE DATA LENGTH TO ADDRESS
-                    when 3 =>
-                        -- Send 4 bytes
-                        if (wvalid = '0') then           -- Write Data
-                            wvalid <= '1';
-                            wdata <= X"00000004";
-                        elsif(wready = '1') then
-                            wvalid <= '0';
-                            state := state + 1;
-                        end if;
-
-                    -- PHASE 3 -- 
-                    when 4 =>
-                        if (awvalid = '0') then
-                            awvalid <= '1';                         -- SIGNAL THAT WE HAVE VALID DATA
-                            awaddr <= TRANSMIT_STATUS_ADDRESS;      -- SET WRITE ADDRESS
-                        elsif(awready = '1') then                   -- WAIT FOR BUS TO BE READY
-                            awvalid <= '0';                         -- DESSERT AWVALID DATA
-                            state := state + 1;
-                        end if;
-
-                    when 5 =>
-                        if (arvalid = '0') then
-                            arvalid <= '1';
-                            araddr <= TRANSMIT_STATUS_ADDRESS;
-                        elsif(arready = '1') then
+                        if arready = '1' then
                             arvalid <= '0';
                             state := state + 1;
                         end if;
 
-                    when 6 => 
-                        if (rready = '0') then
+                    when 7 =>
+                        if rvalid <= '1' then
+                            udp_length (15 downto 8) := rdata[7:0];
+                            arvalid <= '1';
                             rready <= '1';
-                        elsif (rvalid ='1') then
-                            rready <= '0';
-                            transmit_control_register := rdata;
+                            raddr <= std_logic_vector( unsigned(UDP_LENGTH_ADDRESS) + 1 )
                             state := state + 1;
                         end if;
 
-                    when 7=>
-                        if (wvalid = '0') then
-                            wvalid <= '1';
-                            wdata <= (transmit_control_register or X"00000001");
-                        elsif(wready = '1') then
-                            wvalid <= '1';
-                            state := state + 1;
-                        end if;
-
-                    -- PHASE 4 --
-                    -- WAIT FOR TRANSMIT TO FINISH
                     when 8 =>
-                        if (rready = '0') then
+                        if arready = '1' then
+                            arvalid <= '0';
+                            state := state + 1;
+                        end if;
+
+                    when 9 =>
+                        if rvalid = '1' then
+                            rready <= '0';
+                            udp_length (7 downto 0) := rdata (31 downto 24);
+                            instruction (31 downto 24) = rdata (23 downto 0);
+                            instruction_length := 1;
+                            arvalid <= '1';
                             rready <= '1';
-                        elsif (rvalid ='1') then
-                            if (rdata(0) = '0') then 
-                                state := 0;
-                                rready <= '0';
+
+
+                            receive_read_address := receive_read_address + 1;
+                            raddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address), 13);
+
+                            
+                            
+                            state := state + 1;
+                        end if;
+                    when 10 =>
+                        if rready = '1' then
+                            arvalid <= '0';
+                            state := state + 1;
+                        end if;
+
+                    when 11 =>
+                        if rready = '1' then
+                            instruction (((4 - instruction_length) * 8) - 1 downto 0) := rdata (31 downto ((4 - instruction_length) * 8));
+                            
+                            if instruction_length = 0 then
+                                parial_instruction <= X"0";
+                            else
+                                partial_instruction (31 downto ((4 - 4 - instruction_length) * 8 )- 1);
+                            end if;
+                            
+                            instruction_length := (4 - (4 - instruction_length));
+                            udp_length := udp_length - 4;
+
+
+                            -- TODO: SEND DATA TO PROCESSING UNIT
+                            -- PU <= instruction
+                            -- instruction <= partial_instruction
+
+                            if udp_len > 0 then
+                                arvalid <= '1';
+                                rready <= '1';
+                                receive_read_address := receive_read_address + 1;
+                                raddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address), 13);
+                            else 
+                                awvalid <= '1';
+                                wvalid <= '1';
+                                bready <= '1';
+                                wstrb <= X"F";
+                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                wdata <= receive_control_register & X"FFFE";
                             end if;
                         end if;
-                        
+
                     when others =>
-                        state := 0;
+
                 end case;
             end if;
         end if;
