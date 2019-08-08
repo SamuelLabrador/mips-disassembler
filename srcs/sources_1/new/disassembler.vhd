@@ -41,10 +41,6 @@ entity disassembler is
         RECEIVE_RESET_STATE : INTEGER := 4;
         TRANSMIT_RESET_STATE : INTEGER := 0;
         
-        IPV4_DST_START : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"111";
-
-        UDP_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"111";
-
         READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"000";
         WRITE_ADDR : STD_LOGIC_VECTOR (12 downto 0) :=  '0' & X"000";
         
@@ -52,9 +48,16 @@ entity disassembler is
         FPGA_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";
         FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
 
-        DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
-        DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
-        DESITNATION_PORT : INTEGER := 2000;
+        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
+        TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
+        TX_DESITNATION_PORT : INTEGER := 2000;
+
+        -- DATA LOCATIONS IN DUAL PORT MEMORY
+        IPV4_DST_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"007";
+        UDP_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"009";
+        UDP_DATA_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"00A";
+
+        
 
 
         -- TX LENGTH REGISTER
@@ -183,7 +186,7 @@ architecture Structural of disassembler is
       );
     end component axi_ethernetlite_0;
 
-    function convert_to_vector()
+    -- function convert_to_vector()
 
     -- TEST MODULES
     signal arid, arlock, rid : STD_LOGIC_VECTOR (0 downto 0) := "0";
@@ -255,7 +258,10 @@ architecture Structural of disassembler is
         variable receive_state, state, receive_read_address, transmit_read_address : INTEGER := 0;
         variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
         variable receive_control_register, transmit_control_register : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
-        
+        variable udp_length : STD_LOGIC_VECTOR (15 downto 0) := X"0000";
+        variable instruction_length : INTEGER := 0;
+        variable instruction, partial_instruction, ip_destination : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
+    
     begin
     
         if rising_edge(CLK100MHZ) then   
@@ -266,43 +272,43 @@ architecture Structural of disassembler is
             -- RESET LOGIC
             -- ACTIVE LOW!
             if reset = '0' then
-                awaddr = '0' & X"000";
-                awvalid = '0';
-                wdata = X"0000";
-                wstrb = X"0";
-                wvalid = '0';
-                bready = '0';
-                araddr = '0' & X"000";
-                arvalid = '0';
-                rready = '0';
-                receive_state = 0;
-                state = 0;
-                ethernet_mode = '0';
+                awaddr <= '0' & X"000";
+                awvalid <= '0';
+                wdata <= X"00000000";
+                wstrb <= X"0";
+                wvalid <= '0';
+                bready <= '0';
+                araddr <= '0' & X"000";
+                arvalid <= '0';
+                rready <= '0';
+                
+                receive_state := 0;
+                state := 0;
+                ethernet_mode := '0';
 
             -- RECEIVE SUB PROCESS
-            elsif ethernet_mode = RECEIVE_MODE then
+            elsif ethernet_mode = RECEIVE_MODE then               
                 case receive_state is
-                    -- SET READ ADDRESS
                     when 0 => 
                         if arready = '0' then 
                             arvalid <= '1';
                             rready <= '1';
-                            raddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                        elsif arready = '1' then =>
+                            araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                        elsif arready = '1' then 
                             arvalid <= '0';
                             receive_state := receive_state + 1;
                         end if;
-                    -- CHECK READ DATA
-                    when 1 =>                  
+
+                    when 1 =>
                         if rvalid = '1' then
                             rready <= '1';
                             arvalid <= '1';                                
                             if rdata(0) = '1' then
                                 receive_state := receive_state + 1;
-                                raddr <= IPV4_DST_START_ADDRESS;
+                                araddr <= IPV4_DST_ADDRESS;
                             else
                                 receive_state := receive_state - 1;
-                                raddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
                             end if;
                         end if;
                     
@@ -311,16 +317,14 @@ architecture Structural of disassembler is
                             arvalid <= '0';
                             receive_state := receive_state + 1;
                         end if;
-                    -- GET UPPER 2 BYTES OF IPV4 DEST ADDRESS
 
                     when 3 =>
                         if rvalid = '1' then
                             ip_destination (31 downto 16) := rdata (15 downto 0);
-                            raddr <= std_logic_vector( unsigned(IPV4_DST_START_ADDRESS) + 1 );
+                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(IPV4_DST_ADDRESS) + 1);
                             arvalid <= '1';
                             rready <= '1';
                             receive_state := receive_state + 1;
-
                         end if;
                     
                     when 4 =>
@@ -329,18 +333,18 @@ architecture Structural of disassembler is
                             receive_state := receive_state + 1;
                         end if;
 
-                    -- GET LOWER 2 BYTES OF IPV4 DEST ADDRESS
                     when 5 =>
                         if rvalid = '1' then
-                            rready <= '0'
+                            rready <= '0';
                             ip_destination (15 downto 0) := rdata (31 downto 16);
 
                             -- CHECK IF PACKET IS FOR FPGA
                             if ip_destination = FPGA_IPV4_ADDRESS then
+                                r_led := not r_led;
                                 state := state + 1;
                                 arvalid <= '1';
                                 rready <= '1';
-                                raddr <= UDP_LENGTH_ADDRESS;
+                                araddr <= UDP_LENGTH_ADDRESS;
                             else 
                                 state := RECEIVE_RESET_STATE;
                                 awvalid <= '1';
@@ -348,7 +352,7 @@ architecture Structural of disassembler is
                                 bready <= '1';
                                 wstrb <= X"F";
                                 awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                wdata <= receive_control_register and X"FFFE";
+                                wdata <= receive_control_register and X"FFFFFFFE";
                             end if;
                         end if;
 
@@ -360,10 +364,10 @@ architecture Structural of disassembler is
 
                     when 7 =>
                         if rvalid <= '1' then
-                            udp_length (15 downto 8) := rdata[7:0];
+                            udp_length (15 downto 0) := rdata (15 downto 0);
                             arvalid <= '1';
                             rready <= '1';
-                            raddr <= std_logic_vector( unsigned(UDP_LENGTH_ADDRESS) + 1 )
+                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(UDP_LENGTH_ADDRESS) + 1);
                             state := state + 1;
                         end if;
 
@@ -376,20 +380,17 @@ architecture Structural of disassembler is
                     when 9 =>
                         if rvalid = '1' then
                             rready <= '0';
-                            udp_length (7 downto 0) := rdata (31 downto 24);
-                            instruction (31 downto 24) = rdata (23 downto 0);
-                            instruction_length := 1;
+                            instruction (31 downto 16) := rdata (15 downto 0);
+                            instruction_length := 2;
                             arvalid <= '1';
                             rready <= '1';
 
-
                             receive_read_address := receive_read_address + 1;
-                            raddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address), 13);
+                            araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
 
-                            
-                            
                             state := state + 1;
                         end if;
+
                     when 10 =>
                         if rready = '1' then
                             arvalid <= '0';
@@ -398,39 +399,66 @@ architecture Structural of disassembler is
 
                     when 11 =>
                         if rready = '1' then
-                            instruction (((4 - instruction_length) * 8) - 1 downto 0) := rdata (31 downto ((4 - instruction_length) * 8));
+                        
+                            instruction (15 downto 0) := rdata (31 downto 16);
+                            partial_instruction (31 downto 16) := rdata(15 downto 0);
                             
-                            if instruction_length = 0 then
-                                parial_instruction <= X"0";
-                            else
-                                partial_instruction (31 downto ((4 - 4 - instruction_length) * 8 )- 1);
-                            end if;
-                            
-                            instruction_length := (4 - (4 - instruction_length));
-                            udp_length := udp_length - 4;
-
+                            udp_length := STD_LOGIC_VECTOR(UNSIGNED(udp_length) - 4); 
 
                             -- TODO: SEND DATA TO PROCESSING UNIT
-                            -- PU <= instruction
+                            -- PU <= instruction & rdata (31 downto (instruction_length * 8))
                             -- instruction <= partial_instruction
 
-                            if udp_len > 0 then
+                            if UNSIGNED(udp_length) /= 0 then
                                 arvalid <= '1';
                                 rready <= '1';
+                                instruction := partial_instruction;
+                                
                                 receive_read_address := receive_read_address + 1;
-                                raddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address), 13);
+                                araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
                             else 
                                 awvalid <= '1';
                                 wvalid <= '1';
                                 bready <= '1';
                                 wstrb <= X"F";
                                 awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                wdata <= receive_control_register & X"FFFE";
+                                wdata <= receive_control_register and X"FFFFFFFE";
                             end if;
                         end if;
-
+                        
+                        when 12 =>
+                            if awready = '1' and wready = '1' then
+                                wvalid <= '0';
+                                awvalid <= '0';
+                                state := state + 1;
+                            else
+                                awvalid <= '1';
+                                wvalid <= '1';
+                                bready <= '1';
+                                wstrb <= X"F";
+                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                wdata <= receive_control_register and X"FFFFFFFE";
+                            end if;
+                            
+                        when 13 =>
+                            if bvalid = '1' then
+                                if bresp /= "00" then
+                                    awvalid <= '1';
+                                    wvalid <= '1';
+                                    bready <= '1';
+                                    wstrb <= X"F";
+                                    awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                    wdata <= receive_control_register and X"FFFFFFFE";
+                                    state := state - 1;
+                                else
+                                    arvalid <= '1';
+                                    rready <= '1';
+                                    araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                    state := 0;
+                                end if;
+                            end if;
                     when others =>
-
+                        state := 0;
                 end case;
             end if;
         end if;
