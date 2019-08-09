@@ -119,7 +119,10 @@ architecture Structural of disassembler is
     -- CLOCK WIZARD SIGNALS
     signal CLK25MHZ : STD_LOGIC := '0';
     
-    -- AXI BUS SIGNALS
+    -- GLOBAL CONTROL SIGNALS
+    signal transmit_enable : STD_LOGIC := '0';
+
+    -- AXI ETHERNET BUS SIGNALS
     signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
     signal awaddr, araddr : STD_LOGIC_VECTOR (12 DOWNTO 0);
     signal awvalid, awready, arvalid, arready, wvalid, wready, rvalid, rready, irpt, bready, bvalid : STD_LOGIC := '0'; 
@@ -465,6 +468,18 @@ architecture Structural of disassembler is
             elsif ethernet_mode = TRANSMIT_MODE then
             	case transmit_state is
             		when 0 =>
+            			if transmit_enable = '1' then
+            				transmit_state := transmit_state + 1;
+
+            				awaddr <= UDP_LENGTH_ADDRESS;
+            				awvalid <= '1';
+            				wvalid <= '1';
+            				wstrb <= X"3";
+            			end if;
+
+            		when 1 =>
+
+
 
             		when others =>
 
