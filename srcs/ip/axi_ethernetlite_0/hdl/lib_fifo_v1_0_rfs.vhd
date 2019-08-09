@@ -169,11 +169,11 @@
 -- ^^^^^^
 --     RBODDU  07/12/2012     EDK 14.5
 -- ~~~~~~
---     - Update to use fifo_generator_v12_0_5
+--     - Update to use fifo_generator_v12_0
 --     - Added sleep, wr_rst_busy, and rd_rst_busy signals
 --     - Changed FULL_FLAGS_RST_VAL to '1'
 -- ^^^^^^
---     - Update to use fifo_generator_v13_0_6 (New parameter C_EN_SAFETY_CKT  is added with default value as 0 or disabled)
+--     - Update to use fifo_generator_v13_0 (New parameter C_EN_SAFETY_CKT  is added with default value as 0 or disabled)
 --
 -------------------------------------------------------------------------------
 library IEEE;
@@ -184,11 +184,11 @@ USE IEEE.STD_LOGIC_UNSIGNED.ALL;
 USE IEEE.std_logic_arith.ALL;
 
 
-library fifo_generator_v13_2_2;
-use fifo_generator_v13_2_2.all;
---library lib_fifo_v1_0_11;
---use lib_fifo_v1_0_11.lib_fifo_pkg.all;
---use lib_fifo_v1_0_11.family_support.all;
+library fifo_generator_v13_2_4;
+use fifo_generator_v13_2_4.all;
+--library lib_fifo_v1_0_13;
+--use lib_fifo_v1_0_13.lib_fifo_pkg.all;
+--use lib_fifo_v1_0_13.family_support.all;
 
 
 -- synopsys translate_off
@@ -227,7 +227,7 @@ entity async_fifo_fg is
         C_WR_COUNT_WIDTH   : integer := 3 ;
         C_WR_ERR_LOW       : integer := 0 ;
         C_SYNCHRONIZER_STAGE : integer := 2;    -- valid values are 0 to 8  
-        C_XPM_FIFO         : integer := 0
+        C_XPM_FIFO         : integer := 1
     );
   port (
         Din            : in std_logic_vector(C_DATA_WIDTH-1 downto 0) := (others => '0');
@@ -801,7 +801,7 @@ end generate full_gen1;
          -- legacy BRAM implementations of an Async FIFo.
          --
          -------------------------------------------------------------------------------
-         I_ASYNC_FIFO_BRAM : entity fifo_generator_v13_2_2.fifo_generator_v13_2_2
+         I_ASYNC_FIFO_BRAM : entity fifo_generator_v13_2_4.fifo_generator_v13_2_4
             generic map(
               C_COMMON_CLOCK                 =>  0,   
               C_COUNT_TYPE                   =>  0,   
@@ -1408,7 +1408,7 @@ end generate full_gen1;
          -- legacy BRAM implementations of an Async FIFo.
          --
          -------------------------------------------------------------------------------
-         I_ASYNC_FIFO_BRAM : entity fifo_generator_v13_2_2.fifo_generator_v13_2_2
+         I_ASYNC_FIFO_BRAM : entity fifo_generator_v13_2_4.fifo_generator_v13_2_4
             generic map(
               C_COMMON_CLOCK                 =>  0,                                              
               C_COUNT_TYPE                   =>  0,                                              
@@ -2181,20 +2181,20 @@ end implementation;
 -- ^^^^^^
 --     RBODDU  07/12/2012     EDK 14.5
 -- ~~~~~~
---     - Update to use fifo_generator_v12_0_5
+--     - Update to use fifo_generator_v12_0
 --     - Added sleep, wr_rst_busy, and rd_rst_busy signals
 --     - Changed FULL_FLAGS_RST_VAL to '1'
 -- ^^^^^^
 --   KARTHEEK 03/02/2016
---     - Update to use fifo_generator_v13_2_2
+--     - Update to use fifo_generator_v13_2_4
 -------------------------------------------------------------------------------
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
 
-library fifo_generator_v13_2_2;
-use fifo_generator_v13_2_2.all;
+library fifo_generator_v13_2_4;
+use fifo_generator_v13_2_4.all;
 
 Library xpm;
 use xpm.vcomponents.all;
@@ -2225,7 +2225,7 @@ entity sync_fifo_fg is
     C_WRITE_DATA_WIDTH   :    integer := 16;
     C_WRITE_DEPTH        :    integer := 16;
     C_SYNCHRONIZER_STAGE :    integer := 2;    -- Valid values are 0 to 8
-    C_XPM_FIFO           :    integer range 0 to 1 := 0
+    C_XPM_FIFO           :    integer range 0 to 1 := 1
     );
   port (
     Clk          : in  std_logic;
@@ -2678,7 +2678,9 @@ xpm_fifo_sync_inst : xpm_fifo_sync
   Rd_err      <= Rd_err_i when (C_HAS_RD_ERR = 1) else '0';
 
      
-     Data_count <=  sig_full_fg_datacnt;
+     Data_count <=  sig_full_fg_datacnt(FGEN_CNT_WIDTH-1 downto 
+                    FGEN_CNT_WIDTH-C_DCOUNT_WIDTH);   
+     --Data_count <=  sig_full_fg_datacnt;
 
 STD_MODE : if READ_MODE = "std" generate
 begin
@@ -2819,7 +2821,7 @@ begin
     -- BRAM implementations of a legacy Sync FIFO
     --
     -------------------------------------------------------------------------------
-    I_SYNC_FIFO_BRAM : entity fifo_generator_v13_2_2.fifo_generator_v13_2_2 
+    I_SYNC_FIFO_BRAM : entity fifo_generator_v13_2_4.fifo_generator_v13_2_4 
       generic map(
         C_COMMON_CLOCK                 =>  1,                                           
         C_COUNT_TYPE                   =>  0,                                           

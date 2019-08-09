@@ -460,6 +460,15 @@ architecture Structural of disassembler is
                     when others =>
                         state := 0;
                 end case;
+
+            -- TRANSMIT SUB PROCESS
+            elsif ethernet_mode = TRANSMIT_MODE then
+            	case transmit_state is
+            		when 0 =>
+
+            		when others =>
+
+            	end case;
             end if;
         end if;
     end process;
