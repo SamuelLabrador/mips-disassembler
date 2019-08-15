@@ -15,85 +15,13 @@
    <zoom_setting>
       <ZoomStartTime time="0fs"></ZoomStartTime>
       <ZoomEndTime time="1000000001fs"></ZoomEndTime>
-      <Cursor1Time time="999995000fs"></Cursor1Time>
+      <Cursor1Time time="10000000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
       <NameColumnWidth column_width="175"></NameColumnWidth>
-      <ValueColumnWidth column_width="142"></ValueColumnWidth>
+      <ValueColumnWidth column_width="122"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="41" />
-   <wvobject type="logic" fp_name="/disassembler_tb/r_clk">
-      <obj_property name="ElementShortName">r_clk</obj_property>
-      <obj_property name="ObjectShortName">r_clk</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_reset">
-      <obj_property name="ElementShortName">r_reset</obj_property>
-      <obj_property name="ObjectShortName">r_reset</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_col">
-      <obj_property name="ElementShortName">r_eth_col</obj_property>
-      <obj_property name="ObjectShortName">r_eth_col</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_crs">
-      <obj_property name="ElementShortName">r_eth_crs</obj_property>
-      <obj_property name="ObjectShortName">r_eth_crs</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_mdc">
-      <obj_property name="ElementShortName">r_eth_mdc</obj_property>
-      <obj_property name="ObjectShortName">r_eth_mdc</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_ref_clk">
-      <obj_property name="ElementShortName">r_eth_ref_clk</obj_property>
-      <obj_property name="ObjectShortName">r_eth_ref_clk</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_rstn">
-      <obj_property name="ElementShortName">r_eth_rstn</obj_property>
-      <obj_property name="ObjectShortName">r_eth_rstn</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_rx_clk">
-      <obj_property name="ElementShortName">r_eth_rx_clk</obj_property>
-      <obj_property name="ObjectShortName">r_eth_rx_clk</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/eth_rx_dv">
-      <obj_property name="ElementShortName">eth_rx_dv</obj_property>
-      <obj_property name="ObjectShortName">eth_rx_dv</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/eth_rxd">
-      <obj_property name="ElementShortName">eth_rxd</obj_property>
-      <obj_property name="ObjectShortName">eth_rxd</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_rx_dv">
-      <obj_property name="ElementShortName">r_eth_rx_dv</obj_property>
-      <obj_property name="ObjectShortName">r_eth_rx_dv</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_tx_clk">
-      <obj_property name="ElementShortName">r_eth_tx_clk</obj_property>
-      <obj_property name="ObjectShortName">r_eth_tx_clk</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_tx_en">
-      <obj_property name="ElementShortName">r_eth_tx_en</obj_property>
-      <obj_property name="ObjectShortName">r_eth_tx_en</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_eth_rxerr">
-      <obj_property name="ElementShortName">r_eth_rxerr</obj_property>
-      <obj_property name="ObjectShortName">r_eth_rxerr</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/r_led">
-      <obj_property name="ElementShortName">r_led[3:0]</obj_property>
-      <obj_property name="ObjectShortName">r_led[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/r_eth_rxd">
-      <obj_property name="ElementShortName">r_eth_rxd[3:0]</obj_property>
-      <obj_property name="ObjectShortName">r_eth_rxd[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/r_eth_txd">
-      <obj_property name="ElementShortName">r_eth_txd[3:0]</obj_property>
-      <obj_property name="ObjectShortName">r_eth_txd[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="other" fp_name="/disassembler_tb/counter">
-      <obj_property name="ElementShortName">counter</obj_property>
-      <obj_property name="ObjectShortName">counter</obj_property>
-   </wvobject>
+   <WVObjectSize size="32" />
    <wvobject fp_name="divider24" type="divider">
       <obj_property name="label">READ SLAVE FSM</obj_property>
       <obj_property name="DisplayName">label</obj_property>
@@ -122,13 +50,13 @@
       <obj_property name="label">AXI WRITE BUS</obj_property>
       <obj_property name="DisplayName">label</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/UUT/awaddr">
-      <obj_property name="ElementShortName">awaddr[12:0]</obj_property>
-      <obj_property name="ObjectShortName">awaddr[12:0]</obj_property>
-   </wvobject>
    <wvobject type="array" fp_name="/disassembler_tb/UUT/wdata">
       <obj_property name="ElementShortName">wdata[31:0]</obj_property>
       <obj_property name="ObjectShortName">wdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/disassembler_tb/UUT/awaddr">
+      <obj_property name="ElementShortName">awaddr[12:0]</obj_property>
+      <obj_property name="ObjectShortName">awaddr[12:0]</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/disassembler_tb/UUT/awvalid">
       <obj_property name="ElementShortName">awvalid</obj_property>
@@ -162,13 +90,13 @@
       <obj_property name="ElementShortName">bresp[1:0]</obj_property>
       <obj_property name="ObjectShortName">bresp[1:0]</obj_property>
    </wvobject>
+   <wvobject type="array" fp_name="/disassembler_tb/UUT/rresp">
+      <obj_property name="ElementShortName">rresp[1:0]</obj_property>
+      <obj_property name="ObjectShortName">rresp[1:0]</obj_property>
+   </wvobject>
    <wvobject fp_name="divider34" type="divider">
       <obj_property name="label">AXI READ BUS</obj_property>
       <obj_property name="DisplayName">label</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/UUT/rdata">
-      <obj_property name="ElementShortName">rdata[31:0]</obj_property>
-      <obj_property name="ObjectShortName">rdata[31:0]</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/disassembler_tb/UUT/arvalid">
       <obj_property name="ElementShortName">arvalid</obj_property>
@@ -185,5 +113,41 @@
    <wvobject type="logic" fp_name="/disassembler_tb/UUT/rready">
       <obj_property name="ElementShortName">rready</obj_property>
       <obj_property name="ObjectShortName">rready</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/disassembler_tb/UUT/rdata">
+      <obj_property name="ElementShortName">rdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">rdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider32" type="divider">
+      <obj_property name="label">ASM QUEUE</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/disassembler_tb/r_enable_write">
+      <obj_property name="ElementShortName">r_enable_write</obj_property>
+      <obj_property name="ObjectShortName">r_enable_write</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/disassembler_tb/r_enable_read">
+      <obj_property name="ElementShortName">r_enable_read</obj_property>
+      <obj_property name="ObjectShortName">r_enable_read</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/disassembler_tb/r_status_full">
+      <obj_property name="ElementShortName">r_status_full</obj_property>
+      <obj_property name="ObjectShortName">r_status_full</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/disassembler_tb/r_status_empty">
+      <obj_property name="ElementShortName">r_status_empty</obj_property>
+      <obj_property name="ObjectShortName">r_status_empty</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/disassembler_tb/r_queue_length">
+      <obj_property name="ElementShortName">r_queue_length[15:0]</obj_property>
+      <obj_property name="ObjectShortName">r_queue_length[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/disassembler_tb/r_data_in">
+      <obj_property name="ElementShortName">r_data_in[255:0]</obj_property>
+      <obj_property name="ObjectShortName">r_data_in[255:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/disassembler_tb/r_data_out">
+      <obj_property name="ElementShortName">r_data_out[31:0]</obj_property>
+      <obj_property name="ObjectShortName">r_data_out[31:0]</obj_property>
    </wvobject>
 </wave_config>

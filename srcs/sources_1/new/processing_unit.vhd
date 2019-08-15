@@ -36,7 +36,7 @@ entity processing_unit is
   Port ( 
     clock : in STD_LOGIC;
     instruction : in STD_LOGIC_VECTOR (31 downto 0);
-    code : out std_logic_vector (207 downto 0)   
+    code : out std_logic_vector (255 downto 0)   
   );
 end processing_unit;
 

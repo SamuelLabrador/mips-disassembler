@@ -43,6 +43,9 @@ architecture Behavioral of bytecode_filter_tb is
     signal r_IMM : std_logic_vector (15 downto 0);
     signal r_ADDR : std_logic_vector (25 downto 0);
     
+        
+
+    
 component bytecode_filter is 
     Port ( 
         -- Input

@@ -107,7 +107,14 @@ entity disassembler is
         
         eth_rxerr : in STD_LOGIC;                    -- Error 
                    
-        led : out STD_LOGIC_VECTOR (3 downto 0)
+        led : out STD_LOGIC_VECTOR (3 downto 0);
+        
+        
+        enable_write : IN STD_LOGIC;
+        status_full : OUT STD_LOGIC;
+        status_empty : out STD_LOGIC;
+        queue_length : OUT STD_LOGIC_VECTOR (15 downto 0);
+        data_in : in STD_LOGIC_VECTOR (255 downto 0)
     );
 end disassembler;
 
@@ -183,11 +190,37 @@ architecture Structural of disassembler is
         phy_rst_n : OUT STD_LOGIC;
         phy_tx_en : OUT STD_LOGIC;
         phy_tx_data : OUT STD_LOGIC_VECTOR(3 DOWNTO 0)
+
       );
     end component axi_ethernetlite_0;
 
+    component asm_queue is 
+        PORT(
+            clock : in STD_LOGIC;
+            reset : in STD_LOGIC;
+            enable_write : in STD_LOGIC;
+            enable_read : in STD_LOGIC;
+        
+            status_full : out STD_LOGIC;
+            status_empty : out STD_LOGIC;
+            queue_length : OUT STD_LOGIC_VECTOR (15 downto 0);
+            data_in : in STD_LOGIC_VECTOR (255 downto 0); -- 32 Characters Max
+            data_out : OUT STD_LOGIC_VECTOR (31 downto 0) -- 4 characters
+        );
+    end component asm_queue;
+
     -- SIGNALS FOR READ/WRITE HANDSHAKE SLAVE STATE MACHINES
     signal read_valid, read_done, write_valid, write_done : STD_LOGIC := '0';
+
+    -- SIGNALS FOR INSTRUCTION QUEUE
+    signal asm_enable_write, asm_enable_read, asm_status_full, asm_status_empty : STD_LOGIC;
+--    signal queue_length : INTEGER;
+    signal queue_out, queue_in : STD_LOGIC_VECTOR (15 downto 0):= X"0000";
+    
+    -- SIGNALS FOR ASM QUEUE
+    signal asm_data_out : STD_LOGIC_VECTOR (31 downto 0);
+    signal asm_data_in : STD_LOGIC_VECTOR (255 downto 0);
+--    signal queue_length : STD_LOGIC_VECTOR (15 downto 0);
 
     -- SIGNALS FOR TRANSMIT
     signal MAC_LENGTH, IPV4_LENGTH, IPV4_CHECKSUM, UDP_LENGTH: STD_LOGIC_VECTOR (15 downto 0) := X"1234";
@@ -208,6 +241,31 @@ architecture Structural of disassembler is
        clk_in1 => CLK100MHZ
     );
     
+    --instruction_queue : asm_queue port map(
+    --    clock => CLK100MHZ,
+    --    reset => reset,
+    --    enable_write => asm_enable_write,
+    --    enable_read => asm_enable_read,
+    --    status_full => asm_status_full,
+    --    status_empty => asm_status_empty,
+    --    queue_length => asm_queue_length,
+    --    data_in => asm_data_in,
+    --    data_out => asm_data_out
+    --);
+    instruction_queue : asm_queue port map(
+        clock => CLK100MHZ,
+        reset => reset,
+        enable_write => enable_write,
+        enable_read => asm_enable_read,
+        status_full => status_full,
+        status_empty => status_empty,
+        queue_length => queue_length,
+        data_in => data_in,
+        data_out => asm_data_out
+    );
+    
+    
+
     ethernet_module : axi_ethernetlite_0 port map(
 		s_axi_aclk => CLK100MHZ,
 		s_axi_aresetn => reset,
@@ -250,7 +308,7 @@ architecture Structural of disassembler is
     -- DIRECT 25MHZ CLOCK to ETH_PHY_CLK
     eth_ref_clk <= CLK25MHZ;
 
-    -- SLAVE PROCESS
+    -- SLAVE READ PROCESS
     axi_read : process(CLK100MHZ)
     	variable state : INTEGER := 0;
     begin
@@ -281,7 +339,7 @@ architecture Structural of disassembler is
     	end if;
     end process;
 
-    -- SLAVE PROCESS
+    -- SLAVE WRITE PROCESS
     axi_write : process(CLK100MHZ)
         variable state : INTEGER := 0;
     begin
@@ -323,47 +381,9 @@ architecture Structural of disassembler is
         end if;
     end process;
 
-
-    
---    axi_read_write_test : process(CLK100MHZ, reset)
---    	variable state : INTEGER := 1;
---    begin
---    	if rising_edge(CLK100MHZ) then
---    		case state is
-                
---                when 1 =>
---                    write_valid <= '1';
-
---                    awaddr <= '0' & X"AAA";
---                    wdata <= X"AAAAAAAA";
---                    wstrb <= X"F";
---                    state := state + 1;
-                
---                when 2 =>
---                    if write_done = '1' then
---                        write_valid <= '0';
---        				read_valid <= '1';
---        				araddr <= '0' & X"AAA";
---        				state := state + 1;
---                    end if;
-
---    			when 3 =>
---    				if read_done = '1' then
---    					read_valid <= '0';
---    					state := 0;
---    				end if;
-
---    			when others =>
---    				state := 1;
---    		end case;
---    	end if;
---    end process;
-
     ethernet_buffer_logic : process(CLK100MHZ, reset) 
         
-        -- 0 Means Receive
-        -- 1 Means Transmit
-        variable ethernet_mode: STD_LOGIC := '0';
+        variable ethernet_mode: STD_LOGIC := TRANSMIT_MODE;
 
         variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
         
@@ -402,175 +422,7 @@ architecture Structural of disassembler is
 
             -- RECEIVE SUB PROCESS
             elsif ethernet_mode = RECEIVE_MODE then               
-                --case receive_state is
-                --    when 0 => 
-                --        araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --        read_valid <= '1';
-                --        if read_done = '1' then 
-                --            state := state + 1;
-                --        end if;
-
-                --    when 1 =>
-                --        if rvalid = '1' then
-                --            rready <= '1';
-                --            arvalid <= '1';                                
-                --            if rdata(0) = '1' then
-                --                receive_state := receive_state + 1;
-                --                araddr <= IPV4_DST_ADDRESS;
-                --            else
-                --                receive_state := receive_state - 1;
-                --                araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --            end if;
-                --        end if;
-                    
-                --    when 2 =>    
-                --        if arready = '1' then
-                --            arvalid <= '0';
-                --            receive_state := receive_state + 1;
-                --        end if;
-
-                --    when 3 =>
-                --        if rvalid = '1' then
-                --            ip_destination (31 downto 16) := rdata (15 downto 0);
-                --            araddr <= STD_LOGIC_VECTOR(UNSIGNED(IPV4_DST_ADDRESS) + 1);
-                --            arvalid <= '1';
-                --            rready <= '1';
-                --            receive_state := receive_state + 1;
-                --        end if;
-                    
-                --    when 4 =>
-                --        if arready = '1' then
-                --            arvalid <= '0';
-                --            receive_state := receive_state + 1;
-                --        end if;
-
-                --    when 5 =>
-                --        if rvalid = '1' then
-                --            rready <= '0';
-                --            ip_destination (15 downto 0) := rdata (31 downto 16);
-
-                --            -- CHECK IF PACKET IS FOR FPGA
-                --            if ip_destination = FPGA_IPV4_ADDRESS then
-                --                r_led := not r_led;
-                --                state := state + 1;
-                --                arvalid <= '1';
-                --                rready <= '1';
-                --                araddr <= UDP_LENGTH_ADDRESS;
-                --            else 
-                --                state := RECEIVE_RESET_STATE;
-                --                awvalid <= '1';
-                --                wvalid <= '1';
-                --                bready <= '1';
-                --                wstrb <= X"F";
-                --                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --                wdata <= receive_control_register and X"FFFFFFFE";
-                --            end if;
-                --        end if;
-
-                --    when 6 => 
-                --        if arready = '1' then
-                --            arvalid <= '0';
-                --            state := state + 1;
-                --        end if;
-
-                --    when 7 =>
-                --        if rvalid <= '1' then
-                --            udp_length (15 downto 0) := rdata (15 downto 0);
-                --            arvalid <= '1';
-                --            rready <= '1';
-                --            araddr <= STD_LOGIC_VECTOR(UNSIGNED(UDP_LENGTH_ADDRESS) + 1);
-                --            state := state + 1;
-                --        end if;
-
-                --    when 8 =>
-                --        if arready = '1' then
-                --            arvalid <= '0';
-                --            state := state + 1;
-                --        end if;
-
-                --    when 9 =>
-                --        if rvalid = '1' then
-                --            rready <= '0';
-                --            instruction (31 downto 16) := rdata (15 downto 0);
-                --            instruction_length := 2;
-                --            arvalid <= '1';
-                --            rready <= '1';
-
-                --            receive_read_address := receive_read_address + 1;
-                --            araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
-
-                --            state := state + 1;
-                --        end if;
-
-                --    when 10 =>
-                --        if rready = '1' then
-                --            arvalid <= '0';
-                --            state := state + 1;
-                --        end if;
-
-                --    when 11 =>
-                --        if rready = '1' then
-                        
-                --            instruction (15 downto 0) := rdata (31 downto 16);
-                --            partial_instruction (31 downto 16) := rdata(15 downto 0);
-                            
-                --            udp_length := STD_LOGIC_VECTOR(UNSIGNED(udp_length) - 4); 
-
-                --            -- TODO: SEND DATA TO PROCESSING UNIT
-                --            -- PU <= instruction & rdata (31 downto (instruction_length * 8))
-                --            -- instruction <= partial_instruction
-
-                --            if UNSIGNED(udp_length) /= 0 then
-                --                arvalid <= '1';
-                --                rready <= '1';
-                --                instruction := partial_instruction;
-                                
-                --                receive_read_address := receive_read_address + 1;
-                --                araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
-                --            else 
-                --                awvalid <= '1';
-                --                wvalid <= '1';
-                --                bready <= '1';
-                --                wstrb <= X"F";
-                --                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --                wdata <= receive_control_register and X"FFFFFFFE";
-                --            end if;
-                --        end if;
-                        
-                --        when 12 =>
-                --            if awready = '1' and wready = '1' then
-                --                wvalid <= '0';
-                --                awvalid <= '0';
-                --                state := state + 1;
-                --            else
-                --                awvalid <= '1';
-                --                wvalid <= '1';
-                --                bready <= '1';
-                --                wstrb <= X"F";
-                --                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --                wdata <= receive_control_register and X"FFFFFFFE";
-                --            end if;
-                            
-                --        when 13 =>
-                --            if bvalid = '1' then
-                --                if bresp /= "00" then
-                --                    awvalid <= '1';
-                --                    wvalid <= '1';
-                --                    bready <= '1';
-                --                    wstrb <= X"F";
-                --                    awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --                    wdata <= receive_control_register and X"FFFFFFFE";
-                --                    state := state - 1;
-                --                else
-                --                    arvalid <= '1';
-                --                    rready <= '1';
-                --                    araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                --                    state := 0;
-                --                end if;
-                --            end if;
-                --    when others =>
-                --        state := 0;
-                --end case;
+              
 
             -- TRANSMIT SUB PROCESS
             elsif ethernet_mode = TRANSMIT_MODE then
@@ -650,11 +502,29 @@ architecture Structural of disassembler is
                             if write_done = '1' then
                                 transmit_state := transmit_state + 1;
                                 awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= X"0000" & X"FFFF";
+                                wdata <= X"0000" & X"0000";
+                                asm_enable_read <= '1';
                             end if;
 
-                		when others =>
+                        when 10 =>
+                            if asm_status_empty = '1' then
+                                transmit_state := transmit_state + 1;
+                            else
+                                if write_done = '1' then
+                                    awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                    wdata <= asm_data_out;
+                                    asm_enable_read <= '1';
+                                else
+                                    asm_enable_read <= '0';
+                                    wdata <= asm_data_out;
+                                end if;
+                            end if;
 
+                        when 11 =>
+
+
+                		when others =>
+                            
                 	end case;
                 end if;
             end if;
