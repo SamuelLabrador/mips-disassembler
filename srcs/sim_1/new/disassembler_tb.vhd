@@ -111,29 +111,29 @@ begin
     end process;
     
     
-    send_packet : process (r_eth_rx_clk, r_reset)
-        variable packet : STD_LOGIC_VECTOR (783  downto 0) := X"00005e00facefeedfacebeef080045000054059f400040012f930a00020fc358361008002b4511220002a9f45c5300000000f57b010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637";
-    begin
+--    send_packet : process (r_eth_rx_clk, r_reset)
+--        variable packet : STD_LOGIC_VECTOR (783  downto 0) := X"00005e00facefeedfacebeef080045000054059f400040012f930a00020fc358361008002b4511220002a9f45c5300000000f57b010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637";
+--    begin
         
-        if rising_edge(r_eth_rx_clk) then
+--        if rising_edge(r_eth_rx_clk) then
             
-            -- ACTIVE LOW
-            if r_reset = '0' then
-                counter <= 196;
+--            -- ACTIVE LOW
+--            if r_reset = '0' then
+--                counter <= 196;
             
-            else 
-                if counter = 0 then
-                    r_eth_rx_dv <= '0';
+--            else 
+--                if counter = 0 then
+--                    r_eth_rx_dv <= '0';
                 
-                else
-                    r_eth_rx_dv <= '1';
-                    r_eth_rxd <= packet (((counter * 4) - 1) downto ((counter - 1) * 4));
---                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
-                    counter <= counter - 1;
-                end if;
-            end if;
-        end if;
-    end process;
+--                else
+--                    r_eth_rx_dv <= '1';
+--                    r_eth_rxd <= packet (((counter * 4) - 1) downto ((counter - 1) * 4));
+----                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
+--                    counter <= counter - 1;
+--                end if;
+--            end if;
+--        end if;
+--    end process;
     
 
 end Behavioral;

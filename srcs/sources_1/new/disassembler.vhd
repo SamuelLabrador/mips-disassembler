@@ -50,15 +50,12 @@ entity disassembler is
 
         TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
         TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
-        TX_DESITNATION_PORT : INTEGER := 2000;
+        TX_DESITNATION_PORT : STD_LOGIC_VECTOR (15 downto 0) := X"07D0";
 
         -- DATA LOCATIONS IN DUAL PORT MEMORY
         IPV4_DST_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"007";
         UDP_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"009";
         UDP_DATA_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"00A";
-
-        
-
 
         -- TX LENGTH REGISTER
         -- [31:16]  RESERVED
@@ -120,7 +117,7 @@ architecture Structural of disassembler is
     signal CLK25MHZ : STD_LOGIC := '0';
     
     -- GLOBAL CONTROL SIGNALS
-    signal transmit_enable : STD_LOGIC := '0';
+    signal transmit_enable : STD_LOGIC := '1';
 
     -- AXI ETHERNET BUS SIGNALS
     signal wdata, rdata : STD_LOGIC_VECTOR (31 DOWNTO 0);
@@ -189,8 +186,12 @@ architecture Structural of disassembler is
       );
     end component axi_ethernetlite_0;
 
-    -- function convert_to_vector()
+    -- SIGNALS FOR READ/WRITE HANDSHAKE SLAVE STATE MACHINES
+    signal read_valid, read_done, write_valid, write_done : STD_LOGIC := '0';
 
+    -- SIGNALS FOR TRANSMIT
+    signal MAC_LENGTH, IPV4_LENGTH, IPV4_CHECKSUM, UDP_LENGTH: STD_LOGIC_VECTOR (15 downto 0) := X"1234";
+    
     -- TEST MODULES
     signal arid, arlock, rid : STD_LOGIC_VECTOR (0 downto 0) := "0";
     signal core_start, core_stop, awid, awlock, wlast, bid, rlast : STD_LOGIC := '0';
@@ -198,6 +199,7 @@ architecture Structural of disassembler is
     signal awsize, awcache, awqos, arquos, arcache : STD_LOGIC_VECTOR (3 downto 0);
     signal awprot, arprot, arsize : STD_LOGIC_VECTOR (2 downto 0);
     signal awburst, arburst : STD_LOGIC_VECTOR (1 downto 0);
+
 
     begin
     
@@ -244,12 +246,119 @@ architecture Structural of disassembler is
 		phy_tx_en => eth_tx_en,
 		phy_tx_data => eth_txd
     );
-
     
     -- DIRECT 25MHZ CLOCK to ETH_PHY_CLK
     eth_ref_clk <= CLK25MHZ;
 
-    -- SEND DATA OUT
+    -- SLAVE PROCESS
+    axi_read : process(CLK100MHZ)
+    	variable state : INTEGER := 0;
+    begin
+    	if rising_edge(CLK100MHZ) then
+    		if read_valid = '1' then
+    			case state is
+    				when 0 =>
+    					if arready = '1' then
+    						arvalid <= '0';
+    						state := 1;
+    					else
+    						arvalid <= '1';
+    						rready <= '1';
+    					end if;
+    				when 1 =>
+    					if rvalid <= '1' then
+    						rready <= '0';
+    						read_done <= '1';
+    						state := 2;
+    					end if;
+    				when 2 =>
+    					read_done <= '0';
+    					state := 0;
+    				when others =>
+    					state := 0;
+    			end case;
+    		end if;
+    	end if;
+    end process;
+
+    -- SLAVE PROCESS
+    axi_write : process(CLK100MHZ)
+        variable state : INTEGER := 0;
+    begin
+        if rising_edge(CLK100MHZ) then
+            if write_valid = '1' then
+                case state is
+                    when 0 =>
+                        if awready = '1' and wready = '1' then
+                            wvalid <= '0';
+                            awvalid <= '0';
+                            state := 1;
+                        else
+                            awvalid <= '1';
+                            wvalid <= '1';
+                            bready <= '1';
+                        end if;
+                    when 1 =>
+                        if bvalid <= '1' then
+                            -- BAD RESPONSE, RE-WRITE DATA
+                            if bresp /= "00" then
+                                awvalid <= '1';
+                                wvalid <= '1';
+                                bready <= '1';
+                            else
+                                write_done <= '1';
+                                bready <= '0';
+                                state := 2;
+                            end if;
+                        end if;
+                    when 2 =>
+                        write_done <= '0';
+                        state := 0;
+
+                    when others =>
+                        state := 0;
+                        write_done <= '0';
+                end case;
+            end if;
+        end if;
+    end process;
+
+
+    
+--    axi_read_write_test : process(CLK100MHZ, reset)
+--    	variable state : INTEGER := 1;
+--    begin
+--    	if rising_edge(CLK100MHZ) then
+--    		case state is
+                
+--                when 1 =>
+--                    write_valid <= '1';
+
+--                    awaddr <= '0' & X"AAA";
+--                    wdata <= X"AAAAAAAA";
+--                    wstrb <= X"F";
+--                    state := state + 1;
+                
+--                when 2 =>
+--                    if write_done = '1' then
+--                        write_valid <= '0';
+--        				read_valid <= '1';
+--        				araddr <= '0' & X"AAA";
+--        				state := state + 1;
+--                    end if;
+
+--    			when 3 =>
+--    				if read_done = '1' then
+--    					read_valid <= '0';
+--    					state := 0;
+--    				end if;
+
+--    			when others =>
+--    				state := 1;
+--    		end case;
+--    	end if;
+--    end process;
+
     ethernet_buffer_logic : process(CLK100MHZ, reset) 
         
         -- 0 Means Receive
@@ -258,10 +367,9 @@ architecture Structural of disassembler is
 
         variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
         
-        variable receive_state, state, receive_read_address, transmit_read_address : INTEGER := 0;
+        variable receive_state, state, receive_read_address, transmit_read_address, transmit_state : INTEGER := 0;
         variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
         variable receive_control_register, transmit_control_register : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
-        variable udp_length : STD_LOGIC_VECTOR (15 downto 0) := X"0000";
         variable instruction_length : INTEGER := 0;
         variable instruction, partial_instruction, ip_destination : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
     
@@ -275,215 +383,280 @@ architecture Structural of disassembler is
             -- RESET LOGIC
             -- ACTIVE LOW!
             if reset = '0' then
+
+                -- RESET WRITE SLAVE SIGNALS
+                write_valid <= '0';
                 awaddr <= '0' & X"000";
-                awvalid <= '0';
                 wdata <= X"00000000";
-                wstrb <= X"0";
-                wvalid <= '0';
-                bready <= '0';
+                wstrb <= X"F";
+
+                -- RESET READ SLAVE SIGNALS
+                read_valid <= '0';
                 araddr <= '0' & X"000";
-                arvalid <= '0';
-                rready <= '0';
                 
+                -- RESET MASTER FSM LOGIC
+                transmit_state := 0;
                 receive_state := 0;
                 state := 0;
-                ethernet_mode := '0';
+                ethernet_mode := TRANSMIT_MODE;
 
             -- RECEIVE SUB PROCESS
             elsif ethernet_mode = RECEIVE_MODE then               
-                case receive_state is
-                    when 0 => 
-                        if arready = '0' then 
-                            arvalid <= '1';
-                            rready <= '1';
-                            araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                        elsif arready = '1' then 
-                            arvalid <= '0';
-                            receive_state := receive_state + 1;
-                        end if;
+                --case receive_state is
+                --    when 0 => 
+                --        araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --        read_valid <= '1';
+                --        if read_done = '1' then 
+                --            state := state + 1;
+                --        end if;
 
-                    when 1 =>
-                        if rvalid = '1' then
-                            rready <= '1';
-                            arvalid <= '1';                                
-                            if rdata(0) = '1' then
-                                receive_state := receive_state + 1;
-                                araddr <= IPV4_DST_ADDRESS;
-                            else
-                                receive_state := receive_state - 1;
-                                araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                            end if;
-                        end if;
+                --    when 1 =>
+                --        if rvalid = '1' then
+                --            rready <= '1';
+                --            arvalid <= '1';                                
+                --            if rdata(0) = '1' then
+                --                receive_state := receive_state + 1;
+                --                araddr <= IPV4_DST_ADDRESS;
+                --            else
+                --                receive_state := receive_state - 1;
+                --                araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --            end if;
+                --        end if;
                     
-                    when 2 =>    
-                        if arready = '1' then
-                            arvalid <= '0';
-                            receive_state := receive_state + 1;
-                        end if;
+                --    when 2 =>    
+                --        if arready = '1' then
+                --            arvalid <= '0';
+                --            receive_state := receive_state + 1;
+                --        end if;
 
-                    when 3 =>
-                        if rvalid = '1' then
-                            ip_destination (31 downto 16) := rdata (15 downto 0);
-                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(IPV4_DST_ADDRESS) + 1);
-                            arvalid <= '1';
-                            rready <= '1';
-                            receive_state := receive_state + 1;
-                        end if;
+                --    when 3 =>
+                --        if rvalid = '1' then
+                --            ip_destination (31 downto 16) := rdata (15 downto 0);
+                --            araddr <= STD_LOGIC_VECTOR(UNSIGNED(IPV4_DST_ADDRESS) + 1);
+                --            arvalid <= '1';
+                --            rready <= '1';
+                --            receive_state := receive_state + 1;
+                --        end if;
                     
-                    when 4 =>
-                        if arready = '1' then
-                            arvalid <= '0';
-                            receive_state := receive_state + 1;
-                        end if;
+                --    when 4 =>
+                --        if arready = '1' then
+                --            arvalid <= '0';
+                --            receive_state := receive_state + 1;
+                --        end if;
 
-                    when 5 =>
-                        if rvalid = '1' then
-                            rready <= '0';
-                            ip_destination (15 downto 0) := rdata (31 downto 16);
+                --    when 5 =>
+                --        if rvalid = '1' then
+                --            rready <= '0';
+                --            ip_destination (15 downto 0) := rdata (31 downto 16);
 
-                            -- CHECK IF PACKET IS FOR FPGA
-                            if ip_destination = FPGA_IPV4_ADDRESS then
-                                r_led := not r_led;
-                                state := state + 1;
-                                arvalid <= '1';
-                                rready <= '1';
-                                araddr <= UDP_LENGTH_ADDRESS;
-                            else 
-                                state := RECEIVE_RESET_STATE;
-                                awvalid <= '1';
-                                wvalid <= '1';
-                                bready <= '1';
-                                wstrb <= X"F";
-                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                wdata <= receive_control_register and X"FFFFFFFE";
-                            end if;
-                        end if;
+                --            -- CHECK IF PACKET IS FOR FPGA
+                --            if ip_destination = FPGA_IPV4_ADDRESS then
+                --                r_led := not r_led;
+                --                state := state + 1;
+                --                arvalid <= '1';
+                --                rready <= '1';
+                --                araddr <= UDP_LENGTH_ADDRESS;
+                --            else 
+                --                state := RECEIVE_RESET_STATE;
+                --                awvalid <= '1';
+                --                wvalid <= '1';
+                --                bready <= '1';
+                --                wstrb <= X"F";
+                --                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --                wdata <= receive_control_register and X"FFFFFFFE";
+                --            end if;
+                --        end if;
 
-                    when 6 => 
-                        if arready = '1' then
-                            arvalid <= '0';
-                            state := state + 1;
-                        end if;
+                --    when 6 => 
+                --        if arready = '1' then
+                --            arvalid <= '0';
+                --            state := state + 1;
+                --        end if;
 
-                    when 7 =>
-                        if rvalid <= '1' then
-                            udp_length (15 downto 0) := rdata (15 downto 0);
-                            arvalid <= '1';
-                            rready <= '1';
-                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(UDP_LENGTH_ADDRESS) + 1);
-                            state := state + 1;
-                        end if;
+                --    when 7 =>
+                --        if rvalid <= '1' then
+                --            udp_length (15 downto 0) := rdata (15 downto 0);
+                --            arvalid <= '1';
+                --            rready <= '1';
+                --            araddr <= STD_LOGIC_VECTOR(UNSIGNED(UDP_LENGTH_ADDRESS) + 1);
+                --            state := state + 1;
+                --        end if;
 
-                    when 8 =>
-                        if arready = '1' then
-                            arvalid <= '0';
-                            state := state + 1;
-                        end if;
+                --    when 8 =>
+                --        if arready = '1' then
+                --            arvalid <= '0';
+                --            state := state + 1;
+                --        end if;
 
-                    when 9 =>
-                        if rvalid = '1' then
-                            rready <= '0';
-                            instruction (31 downto 16) := rdata (15 downto 0);
-                            instruction_length := 2;
-                            arvalid <= '1';
-                            rready <= '1';
+                --    when 9 =>
+                --        if rvalid = '1' then
+                --            rready <= '0';
+                --            instruction (31 downto 16) := rdata (15 downto 0);
+                --            instruction_length := 2;
+                --            arvalid <= '1';
+                --            rready <= '1';
 
-                            receive_read_address := receive_read_address + 1;
-                            araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
+                --            receive_read_address := receive_read_address + 1;
+                --            araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
 
-                            state := state + 1;
-                        end if;
+                --            state := state + 1;
+                --        end if;
 
-                    when 10 =>
-                        if rready = '1' then
-                            arvalid <= '0';
-                            state := state + 1;
-                        end if;
+                --    when 10 =>
+                --        if rready = '1' then
+                --            arvalid <= '0';
+                --            state := state + 1;
+                --        end if;
 
-                    when 11 =>
-                        if rready = '1' then
+                --    when 11 =>
+                --        if rready = '1' then
                         
-                            instruction (15 downto 0) := rdata (31 downto 16);
-                            partial_instruction (31 downto 16) := rdata(15 downto 0);
+                --            instruction (15 downto 0) := rdata (31 downto 16);
+                --            partial_instruction (31 downto 16) := rdata(15 downto 0);
                             
-                            udp_length := STD_LOGIC_VECTOR(UNSIGNED(udp_length) - 4); 
+                --            udp_length := STD_LOGIC_VECTOR(UNSIGNED(udp_length) - 4); 
 
-                            -- TODO: SEND DATA TO PROCESSING UNIT
-                            -- PU <= instruction & rdata (31 downto (instruction_length * 8))
-                            -- instruction <= partial_instruction
+                --            -- TODO: SEND DATA TO PROCESSING UNIT
+                --            -- PU <= instruction & rdata (31 downto (instruction_length * 8))
+                --            -- instruction <= partial_instruction
 
-                            if UNSIGNED(udp_length) /= 0 then
-                                arvalid <= '1';
-                                rready <= '1';
-                                instruction := partial_instruction;
+                --            if UNSIGNED(udp_length) /= 0 then
+                --                arvalid <= '1';
+                --                rready <= '1';
+                --                instruction := partial_instruction;
                                 
-                                receive_read_address := receive_read_address + 1;
-                                araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
-                            else 
-                                awvalid <= '1';
-                                wvalid <= '1';
-                                bready <= '1';
-                                wstrb <= X"F";
-                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                wdata <= receive_control_register and X"FFFFFFFE";
-                            end if;
-                        end if;
+                --                receive_read_address := receive_read_address + 1;
+                --                araddr <= STD_LOGIC_VECTOR(TO_UNSIGNED(receive_read_address, 13));
+                --            else 
+                --                awvalid <= '1';
+                --                wvalid <= '1';
+                --                bready <= '1';
+                --                wstrb <= X"F";
+                --                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --                wdata <= receive_control_register and X"FFFFFFFE";
+                --            end if;
+                --        end if;
                         
-                        when 12 =>
-                            if awready = '1' and wready = '1' then
-                                wvalid <= '0';
-                                awvalid <= '0';
-                                state := state + 1;
-                            else
-                                awvalid <= '1';
-                                wvalid <= '1';
-                                bready <= '1';
-                                wstrb <= X"F";
-                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                wdata <= receive_control_register and X"FFFFFFFE";
-                            end if;
+                --        when 12 =>
+                --            if awready = '1' and wready = '1' then
+                --                wvalid <= '0';
+                --                awvalid <= '0';
+                --                state := state + 1;
+                --            else
+                --                awvalid <= '1';
+                --                wvalid <= '1';
+                --                bready <= '1';
+                --                wstrb <= X"F";
+                --                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --                wdata <= receive_control_register and X"FFFFFFFE";
+                --            end if;
                             
-                        when 13 =>
-                            if bvalid = '1' then
-                                if bresp /= "00" then
-                                    awvalid <= '1';
-                                    wvalid <= '1';
-                                    bready <= '1';
-                                    wstrb <= X"F";
-                                    awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                    wdata <= receive_control_register and X"FFFFFFFE";
-                                    state := state - 1;
-                                else
-                                    arvalid <= '1';
-                                    rready <= '1';
-                                    araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                                    state := 0;
-                                end if;
-                            end if;
-                    when others =>
-                        state := 0;
-                end case;
+                --        when 13 =>
+                --            if bvalid = '1' then
+                --                if bresp /= "00" then
+                --                    awvalid <= '1';
+                --                    wvalid <= '1';
+                --                    bready <= '1';
+                --                    wstrb <= X"F";
+                --                    awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --                    wdata <= receive_control_register and X"FFFFFFFE";
+                --                    state := state - 1;
+                --                else
+                --                    arvalid <= '1';
+                --                    rready <= '1';
+                --                    araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                --                    state := 0;
+                --                end if;
+                --            end if;
+                --    when others =>
+                --        state := 0;
+                --end case;
 
             -- TRANSMIT SUB PROCESS
             elsif ethernet_mode = TRANSMIT_MODE then
-            	case transmit_state is
-            		when 0 =>
-            			if transmit_enable = '1' then
-            				transmit_state := transmit_state + 1;
+            	if transmit_enable = '1' then
+                    case transmit_state is
+                		when 0 =>
+                            -- Write first word of mac address
+                            write_valid <= '1';
+                            wstrb <= X"F";
+                            wdata <= TX_DESTINATION_MAC_ADDRESS (47 downto 16);
+                            awaddr <= '0' & X"000";
+                            
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= TX_DESTINATION_MAC_ADDRESS (15 downto 0) & FPGA_MAC_ADDRESS (47 downto 32);
+                            end if;
 
-            				awaddr <= UDP_LENGTH_ADDRESS;
-            				awvalid <= '1';
-            				wvalid <= '1';
-            				wstrb <= X"3";
-            			end if;
+                		when 1 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= FPGA_MAC_ADDRESS (31 downto 0);
+                            end if;
 
-            		when 1 =>
+                        
+                        when 2 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= MAC_LENGTH & X"4500";
+                            end if;
 
+                        when 3 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= IPV4_LENGTH & X"0000";
+                            end if;
+                            
+                        when 4 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= X"0000FF11";
+                            end if;
+                            
+                        when 5 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= IPV4_CHECKSUM & FPGA_IPV4_ADDRESS (31 downto 16);
+                            end if;
+                            
+                        when 6 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= FPGA_IPV4_ADDRESS (15 downto 0) & TX_DESIINATION_IPV4_ADDRESS (31 downto 16);
+                            end if;
 
+                        when 7 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= TX_DESIINATION_IPV4_ADDRESS (15 downto 0) & TX_DESITNATION_PORT ;
+                            end if;
 
-            		when others =>
+                        when 8 =>
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= TX_DESITNATION_PORT & UDP_LENGTH;
+                            end if;
 
-            	end case;
+                        when 9 => 
+                            if write_done = '1' then
+                                transmit_state := transmit_state + 1;
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                wdata <= X"0000" & X"FFFF";
+                            end if;
+
+                		when others =>
+
+                	end case;
+                end if;
             end if;
         end if;
     end process;
