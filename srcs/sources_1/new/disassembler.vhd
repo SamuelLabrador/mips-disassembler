@@ -22,6 +22,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 USE ieee.numeric_std.ALL;
+USE IEEE.Std_Logic_Arith.conv_unsigned;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -48,7 +49,7 @@ entity disassembler is
         FPGA_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";
         FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
 
-        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
+        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";--X"54AB3AB54511";
         TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
         TX_DESITNATION_PORT : STD_LOGIC_VECTOR (15 downto 0) := X"07D0";
 
@@ -73,7 +74,7 @@ entity disassembler is
         --              0 = Transmit ping buffer is ready to accept new frame.
         --              1 = Frame Transfer in progress.
         --          )
-        TRANSMIT_STATUS_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7FC";
+        TRANSMIT_CONTROL_REGISTER_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"7FC";
         
         -- RECEIVE CONTROL REGISTER (Ping)
         -- [31:4]   RESERVED
@@ -212,16 +213,20 @@ architecture Structural of disassembler is
     -- SIGNALS FOR READ/WRITE HANDSHAKE SLAVE STATE MACHINES
     signal read_valid, read_done, write_valid, write_done : STD_LOGIC := '0';
 
+
+    signal transmit_valid, transmit_done, receive_valid, receive_done : STD_LOGIC := '0';
+
+    signal ethernet_mode : STD_LOGIC := '0';
+
     -- SIGNALS FOR INSTRUCTION QUEUE
     signal asm_enable_write, asm_enable_read, asm_status_full, asm_status_empty : STD_LOGIC;
---    signal queue_length : INTEGER;
     signal queue_out, queue_in : STD_LOGIC_VECTOR (15 downto 0):= X"0000";
     
     -- SIGNALS FOR ASM QUEUE
     signal asm_data_out : STD_LOGIC_VECTOR (31 downto 0);
     signal asm_data_in : STD_LOGIC_VECTOR (255 downto 0);
---    signal queue_length : STD_LOGIC_VECTOR (15 downto 0);
-
+    signal asm_queue_length : STD_LOGIC_VECTOR (15 downto 0);
+    
     -- SIGNALS FOR TRANSMIT
     signal MAC_LENGTH, IPV4_LENGTH, IPV4_CHECKSUM, UDP_LENGTH: STD_LOGIC_VECTOR (15 downto 0) := X"1234";
     
@@ -233,7 +238,6 @@ architecture Structural of disassembler is
     signal awprot, arprot, arsize : STD_LOGIC_VECTOR (2 downto 0);
     signal awburst, arburst : STD_LOGIC_VECTOR (1 downto 0);
 
-
     begin
     
     clk_wiz : clk_wiz_0 port map(
@@ -241,31 +245,18 @@ architecture Structural of disassembler is
        clk_in1 => CLK100MHZ
     );
     
-    --instruction_queue : asm_queue port map(
-    --    clock => CLK100MHZ,
-    --    reset => reset,
-    --    enable_write => asm_enable_write,
-    --    enable_read => asm_enable_read,
-    --    status_full => asm_status_full,
-    --    status_empty => asm_status_empty,
-    --    queue_length => asm_queue_length,
-    --    data_in => asm_data_in,
-    --    data_out => asm_data_out
-    --);
-    instruction_queue : asm_queue port map(
+    assembly_queue : asm_queue port map(
         clock => CLK100MHZ,
         reset => reset,
         enable_write => enable_write,
         enable_read => asm_enable_read,
         status_full => status_full,
-        status_empty => status_empty,
-        queue_length => queue_length,
+        status_empty => asm_status_empty,
+        queue_length => asm_queue_length,
         data_in => data_in,
         data_out => asm_data_out
     );
     
-    
-
     ethernet_module : axi_ethernetlite_0 port map(
 		s_axi_aclk => CLK100MHZ,
 		s_axi_aresetn => reset,
@@ -382,155 +373,208 @@ architecture Structural of disassembler is
     end process;
 
     ethernet_buffer_logic : process(CLK100MHZ, reset) 
+        variable receive_state, transmit_state : INTEGER := 0;
         
-        variable ethernet_mode: STD_LOGIC := TRANSMIT_MODE;
-
-        variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
-        
-        variable receive_state, state, receive_read_address, transmit_read_address, transmit_state : INTEGER := 0;
-        variable data : STD_LOGIC_VECTOR (31 downto 0) := X"DEADBEEF";
-        variable receive_control_register, transmit_control_register : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
-        variable instruction_length : INTEGER := 0;
-        variable instruction, partial_instruction, ip_destination : STD_LOGIC_VECTOR (31 downto 0) := X"00000000";
-    
+        variable transmit_length_address : STD_LOGIC_VECTOR (12 downto 0);
     begin
-    
-        if rising_edge(CLK100MHZ) then   
+        -- RESET LOGIC
+        -- ACTIVE LOW!
+        if reset = '0' then
+
+            -- RESET WRITE SLAVE SIGNALS
+            write_valid <= '0';
+            awaddr <= '0' & X"000";
+            wdata <= X"00000000";
+            wstrb <= X"F";
+
+            -- RESET READ SLAVE SIGNALS
+            read_valid <= '0';
+            araddr <= '0' & X"000";
+            
+            -- RESET MASTER FSM LOGIC
+            transmit_state := 0;
+            receive_state := 0;
+
+        elsif rising_edge(CLK100MHZ) then   
         
-            -- FOR DEBUGGING
-            led <= r_led;
-
-            -- RESET LOGIC
-            -- ACTIVE LOW!
-            if reset = '0' then
-
-                -- RESET WRITE SLAVE SIGNALS
-                write_valid <= '0';
-                awaddr <= '0' & X"000";
-                wdata <= X"00000000";
-                wstrb <= X"F";
-
-                -- RESET READ SLAVE SIGNALS
-                read_valid <= '0';
-                araddr <= '0' & X"000";
-                
-                -- RESET MASTER FSM LOGIC
-                transmit_state := 0;
-                receive_state := 0;
-                state := 0;
-                ethernet_mode := TRANSMIT_MODE;
-
             -- RECEIVE SUB PROCESS
-            elsif ethernet_mode = RECEIVE_MODE then               
-              
+            if ethernet_mode = RECEIVE_MODE then               
+                case receive_state is
+                    when 0 =>
+                        read_valid <= '1';
+                        araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                        if(read_done = '1') then
+                            if rdata(0) = '1' then
+                                receive_state := receive_state + 1;
+                            end if;
+                        end if;
 
+                    when others =>
+                        receive_state := 0;
+                end case;
             -- TRANSMIT SUB PROCESS
             elsif ethernet_mode = TRANSMIT_MODE then
-            	if transmit_enable = '1' then
-                    case transmit_state is
-                		when 0 =>
-                            -- Write first word of mac address
-                            write_valid <= '1';
-                            wstrb <= X"F";
-                            wdata <= TX_DESTINATION_MAC_ADDRESS (47 downto 16);
-                            awaddr <= '0' & X"000";
-                            
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= TX_DESTINATION_MAC_ADDRESS (15 downto 0) & FPGA_MAC_ADDRESS (47 downto 32);
-                            end if;
-
-                		when 1 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= FPGA_MAC_ADDRESS (31 downto 0);
-                            end if;
-
+        	    case transmit_state is
+            		when 0 =>
+                        -- Write first word of mac address
+                        write_valid <= '1';
+                        wstrb <= X"F";
+                        wdata <= TX_DESTINATION_MAC_ADDRESS (47 downto 16);
+                        awaddr <= '0' & X"000";
                         
-                        when 2 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= MAC_LENGTH & X"4500";
-                            end if;
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= TX_DESTINATION_MAC_ADDRESS (15 downto 0) & FPGA_MAC_ADDRESS (47 downto 32);
+                        end if;
 
-                        when 3 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= IPV4_LENGTH & X"0000";
+            		when 1 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= FPGA_MAC_ADDRESS (31 downto 0);
+                        end if;
+                    
+                    when 2 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            
+                            -- Check for runt frame
+                            if (unsigned(asm_queue_length) * 4 + 15) < 60 then
+                                wdata <= X"0078" & X"4500";
+                            else
+                                wdata <= STD_LOGIC_VECTOR((15 + unsigned(asm_queue_length) * 4));
                             end if;
                             
-                        when 4 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= X"0000FF11";
-                            end if;
-                            
-                        when 5 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= IPV4_CHECKSUM & FPGA_IPV4_ADDRESS (31 downto 16);
-                            end if;
-                            
-                        when 6 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= FPGA_IPV4_ADDRESS (15 downto 0) & TX_DESIINATION_IPV4_ADDRESS (31 downto 16);
-                            end if;
+                        end if;
 
-                        when 7 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= TX_DESIINATION_IPV4_ADDRESS (15 downto 0) & TX_DESITNATION_PORT ;
-                            end if;
+                    when 3 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= IPV4_LENGTH & X"0000";
+                        end if;
+                        
+                    when 4 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= X"0000FF11";
+                        end if;
+                        
+                    when 5 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= IPV4_CHECKSUM & FPGA_IPV4_ADDRESS (31 downto 16);
+                        end if;
+                        
+                    when 6 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= FPGA_IPV4_ADDRESS (15 downto 0) & TX_DESIINATION_IPV4_ADDRESS (31 downto 16);
+                        end if;
 
-                        when 8 =>
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= TX_DESITNATION_PORT & UDP_LENGTH;
-                            end if;
+                    when 7 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= TX_DESIINATION_IPV4_ADDRESS (15 downto 0) & TX_DESITNATION_PORT ;
+                        end if;
 
-                        when 9 => 
-                            if write_done = '1' then
-                                transmit_state := transmit_state + 1;
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                wdata <= X"0000" & X"0000";
-                                asm_enable_read <= '1';
-                            end if;
+                    when 8 =>
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= TX_DESITNATION_PORT & UDP_LENGTH;
+                        end if;
 
-                        when 10 =>
+                    when 9 => 
+                        if write_done = '1' then
+                            transmit_state := transmit_state + 1;
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            wdata <= X"0000" & X"0000";
+                        end if;
+
+                    when 10 =>
+                        if write_done = '1' then
+                            write_valid <= '0';
+                            transmit_state := transmit_state + 1;
+                            asm_enable_read <= '1';
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                        end if;
+                        
+                    when 11 =>
+                        if write_done = '1' then
                             if asm_status_empty = '1' then
                                 transmit_state := transmit_state + 1;
-                            else
-                                if write_done = '1' then
-                                    awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                                    wdata <= asm_data_out;
-                                    asm_enable_read <= '1';
-                                else
-                                    asm_enable_read <= '0';
-                                    wdata <= asm_data_out;
-                                end if;
+                                awaddr <= SEND_DATA_LENGTH_ADDRESS;
+                                wdata <= std_logic_vector((UNSIGNED(X"0000" &"000" & awaddr) + 1)) ; 
+                            elsif asm_status_empty = '0' then
+                                asm_enable_read <= '1';
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
                             end if;
+                        else
+                            write_valid <= '1';
+                            asm_enable_read <= '0';
+                            wdata <= asm_data_out;
+                        end if;
+                        
+                    when 12 =>
+                        if write_done = '1' then
+                            awaddr <= TRANSMIT_CONTROL_REGISTER_ADDRESS;
+                            wdata <= X"00000001";
+                            transmit_state := transmit_state + 1;
+                        end if;
 
-                        when 11 =>
+                    when 13 =>
+                        if write_done = '1' then
+                            write_valid <= '0';
+                            read_valid <= '1';
+                            araddr <= '0' & X"000";--TRANSMIT_CONTROL_REGISTER_ADDRESS;
+                            transmit_state := transmit_state + 1;
+                        end if;
+                        
+                    when 14 =>
+                        if read_done = '1' then
+                            if rdata(0) = '0' then
+                                read_valid <= '0';
+                                transmit_done <= '1';
+                            end if;
+                        end if;
 
-
-                		when others =>
-                            
-                	end case;
-                end if;
+            		when others =>
+                        
+            	end case;
             end if;
         end if;
     end process;
 
+    main : process (CLK100MHZ, reset) 
+        variable state : INTEGER := 1;
+    begin
+        if rising_edge(CLK100MHZ) then
+            case state is 
+                when 0 =>
 
+                    if receive_done = '1' then
+                        state := state + 1;
+                    else
+                        ethernet_mode <= RECEIVE_MODE;
+                    end if;
+
+                when 1 =>
+                    if transmit_done = '1' then
+                        state := 0;
+                    else
+                        ethernet_mode <= TRANSMIT_MODE;
+                    end if;
+
+                when others =>
+            end case;
+        end if;
+    end process;
     
 end Structural;

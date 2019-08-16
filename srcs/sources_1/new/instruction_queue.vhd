@@ -50,7 +50,7 @@ end instruction_queue;
 
 architecture Behavioral of instruction_queue is
     type memory_type is array (0 to depth-1) of std_logic_vector(data_out'length downto 1);
-    signal memory : memory_type :=(others => (others => '0'));   --memory for queue.
+    signal memory : memory_type := (others => (others => '0'));   --memory for queue.
     signal addr_read, addr_write: integer := 0;  --read and write pointers.
     signal empty,full : std_logic := '0';
     
@@ -72,7 +72,6 @@ begin
         addr_write <= 0;
         element_count := 0;
     elsif(rising_edge(clock)) then
-        queue_length <= element_count;
         -- "pop" element on queue
         if(enable_read = '1' and empty = '0') then  
             data_out <= memory(addr_read);

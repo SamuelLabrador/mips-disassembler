@@ -81,7 +81,7 @@ architecture Behavioral of disassembler_tb is
     
     
     signal r_clk, r_reset, r_eth_col, r_eth_crs, r_eth_mdc, r_eth_ref_clk, r_eth_rstn, r_eth_rx_clk, eth_rx_dv, eth_rxd, r_eth_rx_dv, r_eth_tx_clk, r_eth_tx_en, r_eth_rxerr : STD_LOGIC := '0';
-    signal r_led, r_eth_rxd, r_eth_txd : STD_LOGIC_VECTOR (3 downto 0);
+    signal r_led, r_eth_rxd, r_eth_txd : STD_LOGIC_VECTOR (3 downto 0) := X"0";
     
     signal counter : INTEGER := 144;
     
@@ -97,8 +97,17 @@ architecture Behavioral of disassembler_tb is
         return logic_vector;
     end function;
     
+    
+    
 begin
-
+    process (r_eth_rx_clk) begin
+        if rising_edge(r_eth_rx_clk) then
+        
+            r_eth_rxd <= r_eth_txd;
+            r_eth_rx_dv <= r_eth_tx_en;
+        end if;
+    end process;
+    
     UUT : disassembler port map(
         CLK100MHZ => r_clk,
         reset => r_reset,
@@ -129,7 +138,6 @@ begin
         wait for 5 ns;
     end process;
    
-    
     -- 25 MHZ clock generation
     PHY_CLK : process begin
         r_eth_ref_clk <= not r_eth_ref_clk;
@@ -145,7 +153,8 @@ begin
         r_reset <= '1';
         wait;
     end process;
-    
+     
+        
  
         process (r_clk)
         
@@ -153,28 +162,30 @@ begin
         variable state : INTEGER := 0;
     begin
         if rising_edge(r_clk) then
-                case state is 
-                
-                    when 0 =>
-                        
-                        r_data_in <= STRING_TO_LOGIC_VECTOR("AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH");
-                        
-                        r_enable_write <= '1';     
-                        state := state + 1;
-                        
-                    when 1=>
-                   
-                        r_enable_write <= '0';
---                        r_enable_read <= '1';
-                        if (r_status_empty = '1') then
+                if r_reset /= '0' then
+                    case state is 
+                    
+                        when 0 =>
+                            
+                            r_data_in <= STRING_TO_LOGIC_VECTOR("AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH");
+                            
+                            r_enable_write <= '1';     
                             state := state + 1;
-                        end if;
-                        
-                    when 2=>
-                        
-                        
-                   when others =>
-                end case;
+                            
+                        when 1=>
+                       
+                            r_enable_write <= '0';
+    --                        r_enable_read <= '1';
+                            if (r_status_empty = '1') then
+                                state := state + 1;
+                            end if;
+                            
+                        when 2=>
+                            
+                            
+                       when others =>
+                    end case;
+                end if;
             end if;
     end process;
    

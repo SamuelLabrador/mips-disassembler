@@ -65,9 +65,10 @@ process(clock, reset)
 
 variable element_count : integer := 0;
 begin
-    if(reset = '1') then
+    -- ACTIVE LOW
+    if(reset = '0') then
         data_out <= (others => '0');
-        empty <= '0';
+        empty <= '1';
         full <= '0';
         addr_read <= 0;
         addr_write <= 0;
@@ -106,7 +107,7 @@ begin
 
 
             addr_write <= addr_write + 7;  
-            element_count := element_count + 7;     
+            element_count := element_count + 8;     
             
             if(addr_write = depth - 1) then        -- resetting write address.
                 addr_write <= 0;
@@ -117,6 +118,7 @@ begin
             else
                 full <= '0';
             end if;
+            empty <= '0';
            
         end if;
         
