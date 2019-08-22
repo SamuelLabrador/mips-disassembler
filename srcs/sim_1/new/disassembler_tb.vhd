@@ -83,6 +83,8 @@ architecture Behavioral of disassembler_tb is
     signal r_clk, r_reset, r_eth_col, r_eth_crs, r_eth_mdc, r_eth_ref_clk, r_eth_rstn, r_eth_rx_clk, eth_rx_dv, eth_rxd, r_eth_rx_dv, r_eth_tx_clk, r_eth_tx_en, r_eth_rxerr : STD_LOGIC := '0';
     signal r_led, r_eth_rxd, r_eth_txd : STD_LOGIC_VECTOR (3 downto 0) := X"0";
     
+    signal start_send : STD_LOGIC := '0';
+    
     signal counter : INTEGER := 144;
     
         function STRING_TO_LOGIC_VECTOR( 
@@ -123,6 +125,7 @@ begin
         eth_txd => r_eth_txd,
         eth_rxerr => r_eth_rxerr,
         led => r_led,
+        
         
         enable_write => r_enable_write,
 --        enable_read => r_enable_read,
@@ -189,15 +192,21 @@ begin
             end if;
     end process;
    
+   
+--   process begin
+--        wait for 5 ns;
+--        start_send <= '1';
+--   end process;
+   
 --    send_packet : process (r_eth_rx_clk, r_reset)
---        variable packet : STD_LOGIC_VECTOR (783  downto 0) := X"00005e00facefeedfacebeef080045000054059f400040012f930a00020fc358361008002b4511220002a9f45c5300000000f57b010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637";
+--        variable packet : STD_LOGIC_VECTOR (851  downto 0) := X"5555555555555555d0000e500afecfeedfacebeef080045000054059f400040012f930a00020fc358361008002b4511220002a9f45c5300000000f57b010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637";
 --    begin
         
 --        if rising_edge(r_eth_rx_clk) then
             
 --            -- ACTIVE LOW
 --            if r_reset = '0' then
---                counter <= 196;
+--                counter <= 208;
             
 --            else 
 --                if counter = 0 then

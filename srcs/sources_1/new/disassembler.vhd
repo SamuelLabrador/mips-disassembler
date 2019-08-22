@@ -49,7 +49,15 @@ entity disassembler is
         FPGA_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";
         FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
 
-        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";--X"54AB3AB54511";
+        -- 00A7000037F5
+        -- Transmit --> 00007A005F73
+
+        -- 00 00 5E 00 FA CE
+
+        -- 0x0000   00 5E 00 00 
+        -- 0x0001   00 00 CE FA
+                                                                       --54AB3AB54511
+        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"005E0000CEFA";--X"54AB3AB54511";
         TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
         TX_DESITNATION_PORT : STD_LOGIC_VECTOR (15 downto 0) := X"07D0";
 
@@ -265,7 +273,7 @@ architecture Structural of disassembler is
 		s_axi_awvalid => awvalid,
 		s_axi_awready => awready,
 		s_axi_wdata => wdata,
-		s_axi_wstrb => wstrb, 		-- NOT USED IN DESIGN
+		s_axi_wstrb => wstrb, 		
 		s_axi_wvalid => wvalid,
 		s_axi_wready => wready,
 		s_axi_bresp => bresp,		-- NOT USED IN DESIGN
@@ -361,6 +369,7 @@ architecture Structural of disassembler is
                             end if;
                         end if;
                     when 2 =>
+                        
                         write_done <= '0';
                         state := 0;
 
@@ -401,6 +410,8 @@ architecture Structural of disassembler is
             if ethernet_mode = RECEIVE_MODE then               
                 case receive_state is
                     when 0 =>
+                        awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                    when 1 =>
                         read_valid <= '1';
                         araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
                         if(read_done = '1') then
@@ -412,6 +423,7 @@ architecture Structural of disassembler is
                     when others =>
                         receive_state := 0;
                 end case;
+
             -- TRANSMIT SUB PROCESS
             elsif ethernet_mode = TRANSMIT_MODE then
         	    case transmit_state is
@@ -424,21 +436,21 @@ architecture Structural of disassembler is
                         
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
-                            wdata <= TX_DESTINATION_MAC_ADDRESS (15 downto 0) & FPGA_MAC_ADDRESS (47 downto 32);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
+                            wdata <=  FPGA_MAC_ADDRESS (47 downto 32) & TX_DESTINATION_MAC_ADDRESS (15 downto 0);
                         end if;
 
             		when 1 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= FPGA_MAC_ADDRESS (31 downto 0);
                         end if;
                     
                     when 2 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             
                             -- Check for runt frame
                             if (unsigned(asm_queue_length) * 4 + 15) < 60 then
@@ -452,49 +464,49 @@ architecture Structural of disassembler is
                     when 3 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= IPV4_LENGTH & X"0000";
                         end if;
                         
                     when 4 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= X"0000FF11";
                         end if;
                         
                     when 5 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= IPV4_CHECKSUM & FPGA_IPV4_ADDRESS (31 downto 16);
                         end if;
                         
                     when 6 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= FPGA_IPV4_ADDRESS (15 downto 0) & TX_DESIINATION_IPV4_ADDRESS (31 downto 16);
                         end if;
 
                     when 7 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= TX_DESIINATION_IPV4_ADDRESS (15 downto 0) & TX_DESITNATION_PORT ;
                         end if;
 
                     when 8 =>
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= TX_DESITNATION_PORT & UDP_LENGTH;
                         end if;
 
                     when 9 => 
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             wdata <= X"0000" & X"0000";
                         end if;
 
@@ -503,7 +515,7 @@ architecture Structural of disassembler is
                             write_valid <= '0';
                             transmit_state := transmit_state + 1;
                             asm_enable_read <= '1';
-                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                            awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                         end if;
                         
                     when 11 =>
@@ -511,10 +523,10 @@ architecture Structural of disassembler is
                             if asm_status_empty = '1' then
                                 transmit_state := transmit_state + 1;
                                 awaddr <= SEND_DATA_LENGTH_ADDRESS;
-                                wdata <= std_logic_vector((UNSIGNED(X"0000" &"000" & awaddr) + 1)) ; 
+                                wdata <= std_logic_vector((UNSIGNED(X"0000" &"000" & awaddr) + 4)) ; 
                             elsif asm_status_empty = '0' then
                                 asm_enable_read <= '1';
-                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 1);
+                                awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             end if;
                         else
                             write_valid <= '1';
@@ -532,19 +544,26 @@ architecture Structural of disassembler is
                     when 13 =>
                         if write_done = '1' then
                             write_valid <= '0';
+
                             read_valid <= '1';
-                            araddr <= '0' & X"000";--TRANSMIT_CONTROL_REGISTER_ADDRESS;
+                            araddr <= TRANSMIT_CONTROL_REGISTER_ADDRESS;
                             transmit_state := transmit_state + 1;
                         end if;
                         
                     when 14 =>
                         if read_done = '1' then
                             if rdata(0) = '0' then
-                                read_valid <= '0';
+                                read_valid <= '1';
                                 transmit_done <= '1';
+                                transmit_state := transmit_state + 1;
+                                araddr <= '1' & X"000";
                             end if;
                         end if;
 
+                    when 15 =>
+                        if read_done = '1' then
+                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(araddr) + 4);
+                        end if;
             		when others =>
                         
             	end case;
@@ -567,7 +586,7 @@ architecture Structural of disassembler is
 
                 when 1 =>
                     if transmit_done = '1' then
-                        state := 0;
+                        --state := 0;
                     else
                         ethernet_mode <= TRANSMIT_MODE;
                     end if;
