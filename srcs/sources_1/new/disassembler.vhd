@@ -23,6 +23,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 USE ieee.numeric_std.ALL;
 USE IEEE.Std_Logic_Arith.conv_unsigned;
+use ieee.std_logic_unsigned.all;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -39,7 +40,7 @@ entity disassembler is
         RECEIVE_MODE : STD_LOGIC := '0';
         TRANSMIT_MODE : STD_LOGIC := '1';
         
-        RECEIVE_RESET_STATE : INTEGER := 4;
+        RECEIVE_RESET_STATE : INTEGER := 5;
         TRANSMIT_RESET_STATE : INTEGER := 0;
         
         READ_ADDR :  STD_LOGIC_VECTOR (12 downto 0) := '1' & X"000";
@@ -63,8 +64,8 @@ entity disassembler is
 
         -- DATA LOCATIONS IN DUAL PORT MEMORY
         IPV4_DST_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"007";
-        UDP_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"009";
-        UDP_DATA_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '0' & X"00A";
+        UDP_LENGTH_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"024";
+        UDP_DATA_ADDRESS : STD_LOGIC_VECTOR (12 downto 0) := '1' & X"02C";
 
         -- TX LENGTH REGISTER
         -- [31:16]  RESERVED
@@ -122,7 +123,6 @@ entity disassembler is
         enable_write : IN STD_LOGIC;
         status_full : OUT STD_LOGIC;
         status_empty : out STD_LOGIC;
-        queue_length : OUT STD_LOGIC_VECTOR (15 downto 0);
         data_in : in STD_LOGIC_VECTOR (255 downto 0)
     );
 end disassembler;
@@ -236,7 +236,7 @@ architecture Structural of disassembler is
     signal asm_queue_length : STD_LOGIC_VECTOR (15 downto 0);
     
     -- SIGNALS FOR TRANSMIT
-    signal MAC_LENGTH, IPV4_LENGTH, IPV4_CHECKSUM, UDP_LENGTH: STD_LOGIC_VECTOR (15 downto 0) := X"1234";
+    signal MAC_LENGTH, IPV4_LENGTH, IPV4_CHECKSUM: STD_LOGIC_VECTOR (15 downto 0) := X"1234";
     
     -- TEST MODULES
     signal arid, arlock, rid : STD_LOGIC_VECTOR (0 downto 0) := "0";
@@ -385,6 +385,10 @@ architecture Structural of disassembler is
         variable receive_state, transmit_state : INTEGER := 0;
         
         variable transmit_length_address : STD_LOGIC_VECTOR (12 downto 0);
+
+        variable udp_length : UNSIGNED(15 downto 0);
+        variable ipv4_destination : STD_LOGIC_VECTOR (31 downto 0);
+        variable packet_length : signed(15 downto 0);
     begin
         -- RESET LOGIC
         -- ACTIVE LOW!
@@ -410,18 +414,76 @@ architecture Structural of disassembler is
             if ethernet_mode = RECEIVE_MODE then               
                 case receive_state is
                     when 0 =>
-                        awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
-                    when 1 =>
                         read_valid <= '1';
                         araddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
                         if(read_done = '1') then
                             if rdata(0) = '1' then
                                 receive_state := receive_state + 1;
+                                araddr <= '1' & X"01C";
                             end if;
                         end if;
 
+                    when 1 =>
+                        if read_done = '1' then
+                            receive_state := receive_state + 1;
+                            ipv4_destination (31 downto 16) := rdata (15 downto 0);
+                            araddr <= '1' & X"020";
+                        end if; 
+                    when 2 =>
+                        if read_done = '1' then
+                            ipv4_destination  (15 downto 0) :=  rdata (31 downto 16);
+                            read_valid <= '1';
+                            if ipv4_destination = FPGA_IPV4_ADDRESS then
+                                receive_state := receive_state + 1;
+                                araddr <= UDP_LENGTH_ADDRESS;
+                            else
+                                receive_state := RECEIVE_RESET_STATE;
+                            end if;
+                        end if;
+
+                    -- GET UDP PACKET LENGTH
+                    when 3 =>
+                        if read_done = '1' then
+                            wdata <= X"0000" & rdata(15 downto 0);
+                            receive_state := receive_state + 1;
+                            packet_length := SIGNED(rdata(15 downto 0));
+                            araddr <= '1' & X"02C";
+                        end if;
+
+                    when 4 =>
+                        if read_done = '1' then
+                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(araddr) + 4);
+                            wdata <= rdata;
+                            if packet_length > 0 then
+                                packet_length := packet_length - 4;
+                            else
+                                receive_state := receive_state + 1;
+                                awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                                wdata <= X"00000000";
+                                write_valid <= '1';
+                                read_valid  <= '0';
+                            end if;
+                        end if;
+
+                    when 5 =>
+                        if write_done = '1' then
+                            write_valid <= '0';
+                            wdata <= X"FFFFFFFF";
+                            receive_state := receive_state + 1;
+                            receive_done <= '1';
+                        else
+                            awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
+                            wdata <= X"00000000";
+                            write_valid <= '1';
+                            read_valid  <= '0';
+                        end if;
+
+                    when 6 => 
+                            receive_state := 0;
+
                     when others =>
                         receive_state := 0;
+
                 end case;
 
             -- TRANSMIT SUB PROCESS
@@ -433,7 +495,7 @@ architecture Structural of disassembler is
                         wstrb <= X"F";
                         wdata <= TX_DESTINATION_MAC_ADDRESS (47 downto 16);
                         awaddr <= '0' & X"000";
-                        
+
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
                             awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
@@ -452,13 +514,10 @@ architecture Structural of disassembler is
                             transmit_state := transmit_state + 1;
                             awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             
-                            -- Check for runt frame
-                            if (unsigned(asm_queue_length) * 4 + 15) < 60 then
-                                wdata <= X"0078" & X"4500";
-                            else
-                                wdata <= STD_LOGIC_VECTOR((15 + unsigned(asm_queue_length) * 4));
-                            end if;
                             
+                            wdata <= X"0078" & STD_LOGIC_VECTOR((15 + unsigned(asm_queue_length)));
+                            udp_length := unsigned(asm_queue_length);
+                                                        
                         end if;
 
                     when 3 =>
@@ -500,7 +559,7 @@ architecture Structural of disassembler is
                         if write_done = '1' then
                             transmit_state := transmit_state + 1;
                             awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
-                            wdata <= TX_DESITNATION_PORT & UDP_LENGTH;
+                            wdata <= TX_DESITNATION_PORT & STD_LOGIC_VECTOR(udp_length);
                         end if;
 
                     when 9 => 
@@ -553,17 +612,17 @@ architecture Structural of disassembler is
                     when 14 =>
                         if read_done = '1' then
                             if rdata(0) = '0' then
-                                read_valid <= '1';
+                                write_valid <= '0';
+                                read_valid <= '0';
                                 transmit_done <= '1';
                                 transmit_state := transmit_state + 1;
-                                araddr <= '1' & X"000";
                             end if;
                         end if;
 
                     when 15 =>
-                        if read_done = '1' then
-                            araddr <= STD_LOGIC_VECTOR(UNSIGNED(araddr) + 4);
-                        end if;
+                        transmit_done <= '0';
+                        transmit_state := 0;
+
             		when others =>
                         
             	end case;
@@ -572,7 +631,7 @@ architecture Structural of disassembler is
     end process;
 
     main : process (CLK100MHZ, reset) 
-        variable state : INTEGER := 1;
+        variable state : INTEGER := 0;
     begin
         if rising_edge(CLK100MHZ) then
             case state is 
@@ -580,13 +639,15 @@ architecture Structural of disassembler is
 
                     if receive_done = '1' then
                         state := state + 1;
+                        ethernet_mode <= TRANSMIT_MODE;
                     else
                         ethernet_mode <= RECEIVE_MODE;
                     end if;
 
                 when 1 =>
                     if transmit_done = '1' then
-                        --state := 0;
+                        state := 0;
+                        ethernet_mode <= RECEIVE_MODE;
                     else
                         ethernet_mode <= TRANSMIT_MODE;
                     end if;

@@ -107,7 +107,7 @@ begin
 
 
             addr_write <= addr_write + 7;  
-            element_count := element_count + 8;     
+            element_count := element_count + 32;     
             
             if(addr_write = depth - 1) then        -- resetting write address.
                 addr_write <= 0;

@@ -68,7 +68,6 @@ architecture Behavioral of disassembler_tb is
 --            enable_read : IN STD_LOGIC;
             status_full : OUT STD_LOGIC;
             status_empty : out STD_LOGIC;
-            queue_length : OUT STD_LOGIC_VECTOR (15 downto 0);
             data_in : in STD_LOGIC_VECTOR (255 downto 0)
 --            data_out : OUT STD_LOGIC_VECTOR
         );
@@ -105,8 +104,8 @@ begin
     process (r_eth_rx_clk) begin
         if rising_edge(r_eth_rx_clk) then
         
-            r_eth_rxd <= r_eth_txd;
-            r_eth_rx_dv <= r_eth_tx_en;
+--            r_eth_rxd <= r_eth_txd;
+--            r_eth_rx_dv <= r_eth_tx_en;
         end if;
     end process;
     
@@ -129,7 +128,6 @@ begin
         
         enable_write => r_enable_write,
 --        enable_read => r_enable_read,
-        queue_length => r_queue_length,
         data_in => r_data_in, 
         status_full => r_status_full,
         status_empty => r_status_empty
