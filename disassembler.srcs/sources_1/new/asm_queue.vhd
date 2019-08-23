@@ -33,7 +33,7 @@ USE ieee.numeric_std.ALL;
 --use UNISIM.VComponents.all;
 
 entity asm_queue is
-    generic (depth : INTEGER := 512);
+    generic (depth : INTEGER := 4096);
   Port ( 
   		clock : in STD_LOGIC;
   		reset : in STD_LOGIC;

@@ -13,15 +13,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="0fs"></ZoomStartTime>
-      <ZoomEndTime time="15000000001fs"></ZoomEndTime>
-      <Cursor1Time time="9210000000fs"></Cursor1Time>
+      <ZoomStartTime time="15736000000fs"></ZoomStartTime>
+      <ZoomEndTime time="18736000001fs"></ZoomEndTime>
+      <Cursor1Time time="17880000000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="184"></NameColumnWidth>
-      <ValueColumnWidth column_width="191"></ValueColumnWidth>
+      <NameColumnWidth column_width="204"></NameColumnWidth>
+      <ValueColumnWidth column_width="105"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="51" />
+   <WVObjectSize size="53" />
    <wvobject fp_name="divider36" type="divider">
       <obj_property name="label">SYS CLOCK</obj_property>
       <obj_property name="DisplayName">label</obj_property>
@@ -158,25 +158,29 @@
       <obj_property name="label">ASM QUEUE</obj_property>
       <obj_property name="DisplayName">label</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_status_full">
-      <obj_property name="ElementShortName">r_status_full</obj_property>
-      <obj_property name="ObjectShortName">r_status_full</obj_property>
+   <wvobject type="array" fp_name="/disassembler_tb/UUT/asm_data_in">
+      <obj_property name="ElementShortName">asm_data_in[255:0]</obj_property>
+      <obj_property name="ObjectShortName">asm_data_in[255:0]</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_status_empty">
-      <obj_property name="ElementShortName">r_status_empty</obj_property>
-      <obj_property name="ObjectShortName">r_status_empty</obj_property>
+   <wvobject type="array" fp_name="/disassembler_tb/UUT/asm_queue_length">
+      <obj_property name="ElementShortName">asm_queue_length[15:0]</obj_property>
+      <obj_property name="ObjectShortName">asm_queue_length[15:0]</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/disassembler_tb/r_enable_write">
-      <obj_property name="ElementShortName">r_enable_write</obj_property>
-      <obj_property name="ObjectShortName">r_enable_write</obj_property>
+   <wvobject type="logic" fp_name="/disassembler_tb/UUT/asm_enable_write">
+      <obj_property name="ElementShortName">asm_enable_write</obj_property>
+      <obj_property name="ObjectShortName">asm_enable_write</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/r_queue_length">
-      <obj_property name="ElementShortName">r_queue_length[15:0]</obj_property>
-      <obj_property name="ObjectShortName">r_queue_length[15:0]</obj_property>
+   <wvobject type="logic" fp_name="/disassembler_tb/UUT/asm_enable_read">
+      <obj_property name="ElementShortName">asm_enable_read</obj_property>
+      <obj_property name="ObjectShortName">asm_enable_read</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/disassembler_tb/r_data_in">
-      <obj_property name="ElementShortName">r_data_in[255:0]</obj_property>
-      <obj_property name="ObjectShortName">r_data_in[255:0]</obj_property>
+   <wvobject type="logic" fp_name="/disassembler_tb/UUT/asm_status_full">
+      <obj_property name="ElementShortName">asm_status_full</obj_property>
+      <obj_property name="ObjectShortName">asm_status_full</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/disassembler_tb/UUT/asm_status_empty">
+      <obj_property name="ElementShortName">asm_status_empty</obj_property>
+      <obj_property name="ObjectShortName">asm_status_empty</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/disassembler_tb/UUT/asm_enable_read">
       <obj_property name="ElementShortName">asm_enable_read</obj_property>
@@ -225,5 +229,9 @@
    <wvobject type="logic" fp_name="/disassembler_tb/r_reset">
       <obj_property name="ElementShortName">r_reset</obj_property>
       <obj_property name="ObjectShortName">r_reset</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/disassembler_tb/start_send">
+      <obj_property name="ElementShortName">start_send</obj_property>
+      <obj_property name="ObjectShortName">start_send</obj_property>
    </wvobject>
 </wave_config>

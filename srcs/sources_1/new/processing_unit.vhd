@@ -36,7 +36,15 @@ entity processing_unit is
   Port ( 
     clock : in STD_LOGIC;
     instruction : in STD_LOGIC_VECTOR (31 downto 0);
-    code : out std_logic_vector (255 downto 0)   
+    code : out std_logic_vector (255 downto 0)
+    
+    -- SIGNALS FOR TAKING IN DATA
+    --write_valid : in STD_LOGIC;
+    --read_ready : out STD_LOGIC 
+
+    -- SIGNALS FRO WRITING DATA TO ASM QUEUE
+    --queue_write : out STD_LOGIC;
+    --queue_full : in STD_LOGIC
   );
 end processing_unit;
 
@@ -57,7 +65,6 @@ architecture Behavioral of processing_unit is
     signal rs, rt, rd, shift : STD_LOGIC_VECTOR (4 downto 0);
     signal imm : STD_LOGIC_VECTOR (15 downto 0);
     signal addr : STD_LOGIC_VECTOR (25 downto 0);
-    signal ascii_code : string (1 to 26);
     
     -- Test registers
     signal ascii_register_test : string (1 to 5);
@@ -232,7 +239,7 @@ architecture Behavioral of processing_unit is
     
         -- Variable that will be returned.
         -- Concatenation of OPCODE, RD, RS, RT
-        variable ascii_code : STRING (1 to 26);             
+        variable ascii_code : STRING (1 to 32);             
                        
         -- 5 Characters at most. 40 bits/ 8 bits/char == 5 characters
         variable ascii_opcode, ascii_rs, ascii_rt, ascii_rd : STRING (1 to 5);  -- MAX OF 5 Characters                     
@@ -336,7 +343,7 @@ architecture Behavioral of processing_unit is
             when others =>
                 ascii_opcode := "     ";
         end case;
-        ascii_code := (ascii_opcode & " " & ascii_rd & ", " & ascii_rs & ", " & ascii_rt & " ");
+        ascii_code := (ascii_opcode & " " & ascii_rd & ", " & ascii_rs & ", " & ascii_rt & "       ");
         return ascii_code;
     end;
     
@@ -346,15 +353,15 @@ architecture Behavioral of processing_unit is
         imm : STD_LOGIC_VECTOR(15 downto 0)
     )
     return STRING is 
-        variable ascii_code : STRING(1 to 26);
+        variable ascii_code : STRING(1 to 32); --32
     begin
         case opcode is
             when "lw   "=>
-                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & "," & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ") ";
+                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & "," & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ")       " ;
             when "sw   "=>
-                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & "," & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ") ";
+                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & "," & LOGIC_VECTOR_TO_HEX_STRING(imm) & "(" & REGISTER_TO_ASCII(rs) & ")       " ;
             when others =>
-                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & ", " & REGISTER_TO_ASCII(rs) & ", " & LOGIC_VECTOR_TO_HEX_STRING(imm);
+                ascii_code := opcode & " " & REGISTER_TO_ASCII(rt) & ", " & REGISTER_TO_ASCII(rs) & ", " & LOGIC_VECTOR_TO_HEX_STRING(imm) & "      " ;
         end case;
         return ascii_code;
     end;
@@ -387,6 +394,7 @@ begin
         );
                
     process (clock, opcode, funct)
+        variable ascii_code : STRING (1 to 32);
     begin
         if rising_edge(clock) then
             case opcode is
@@ -394,7 +402,7 @@ begin
                 -- R INSTRUCTIONS --
                 --------------------
                 when X"00" =>
-                    ascii_code <= R_INSTRUCTION_TO_ASCII(funct, rs, rt, rd, shift);                
+                    ascii_code := R_INSTRUCTION_TO_ASCII(funct, rs, rt, rd, shift);                
                     
                 --------------------
                 -- I INSTRUCTIONS --
@@ -402,75 +410,75 @@ begin
                 
                 -- ADD IMMEDIATE
                 when X"08" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("addi ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("addi ", rs, rt, imm);
                     
                 -- ADD UNSIGNED IMMEDIATE
                 when X"09" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("addiu", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("addiu", rs, rt, imm);
                     
                 -- AND IMMEDIATE
                 when X"0C" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("andi ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("andi ", rs, rt, imm);
                     
                 -- BEQ IMMEDIATE SPECIAL CASE
                 when X"04" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("beq  ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("beq  ", rs, rt, imm);
                     
                 -- BLEZ
                 when X"06" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("blez ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("blez ", rs, rt, imm);
     
                 -- BNE
                 when X"05" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("bne  ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("bne  ", rs, rt, imm);
         
                 -- BGTZ
                 when X"07" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("bgtz ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("bgtz ", rs, rt, imm);
     
                 -- LB
                 when X"20" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("lb   ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("lb   ", rs, rt, imm);
                                 
                 -- LBU
                 when X"24" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("lbu  ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("lbu  ", rs, rt, imm);
         
                 -- LHU
                 when X"25" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("lhu  ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("lhu  ", rs, rt, imm);
     
                 -- LUI
                 when X"0F" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("lui  ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("lui  ", rs, rt, imm);
     
                 -- LW
                 when X"23" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("lw   ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("lw   ", rs, rt, imm);
     
                 -- ORI
                 when X"0D" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("ori  ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("ori  ", rs, rt, imm);
     
                 -- SB
                 when X"28" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("sb   ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("sb   ", rs, rt, imm);
     
                 -- SH
                 when X"29" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("sh   ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("sh   ", rs, rt, imm);
     
                 -- SLTI
                 when X"0A" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("slti ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("slti ", rs, rt, imm);
     
                 -- SLTIU
                 when X"0B" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("sltiu", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("sltiu", rs, rt, imm);
     
                 -- SW
                 when X"2B" =>
-                    ascii_code <= I_INSTRUCTION_TO_ASCII("sw   ", rs, rt, imm);
+                    ascii_code := I_INSTRUCTION_TO_ASCII("sw   ", rs, rt, imm);
     
     
                 --------------------
@@ -480,13 +488,13 @@ begin
                 -- J
                 when X"02" =>
                     -- 5 characters for instruction. 9 characters for address
-                    ascii_code <= "j     " & ADDRESS_TO_HEX_STRING(addr) & "           ";
+                    ascii_code := "j     " & ADDRESS_TO_HEX_STRING(addr) & "                 ";
                 -- JAL
                 when X"03" =>
-                    ascii_code <= "jal   " & ADDRESS_TO_HEX_STRING(addr) & "           ";
+                    ascii_code := "jal   " & ADDRESS_TO_HEX_STRING(addr) & "                 ";
                 -- Unknown OPCODE
                 when others =>
-                
+                    ascii_code := ". DATA VALUE                    ";
             end case;
             
             code <= STRING_TO_LOGIC_VECTOR(ascii_code);

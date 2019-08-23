@@ -48,7 +48,7 @@ entity disassembler is
         
         -- NETWORKING INFO
         FPGA_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";
-        FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
+        FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"C0A8010B";  -- 192.168.1.11
 
         -- 00A7000037F5
         -- Transmit --> 00007A005F73
@@ -117,13 +117,13 @@ entity disassembler is
         
         eth_rxerr : in STD_LOGIC;                    -- Error 
                    
-        led : out STD_LOGIC_VECTOR (3 downto 0);
+        led : out STD_LOGIC_VECTOR (3 downto 0)
         
         
-        enable_write : IN STD_LOGIC;
-        status_full : OUT STD_LOGIC;
-        status_empty : out STD_LOGIC;
-        data_in : in STD_LOGIC_VECTOR (255 downto 0)
+--        enable_write : IN STD_LOGIC;
+--        status_full : OUT STD_LOGIC;
+--        status_empty : out STD_LOGIC;
+--        data_in : in STD_LOGIC_VECTOR (255 downto 0)
     );
 end disassembler;
 
@@ -203,6 +203,15 @@ architecture Structural of disassembler is
       );
     end component axi_ethernetlite_0;
 
+    component processing_unit is
+        Port ( 
+            clock : in STD_LOGIC;
+            instruction : in STD_LOGIC_VECTOR (31 downto 0);
+            code : out std_logic_vector (255 downto 0)
+        );
+    end component;
+
+
     component asm_queue is 
         PORT(
             clock : in STD_LOGIC;
@@ -218,7 +227,7 @@ architecture Structural of disassembler is
         );
     end component asm_queue;
 
-    -- SIGNALS FOR READ/WRITE HANDSHAKE SLAVE STATE MACHINES
+    -- SIGNALS FOR ETHERNET READ/WRITE HANDSHAKE SLAVE STATE MACHINES
     signal read_valid, read_done, write_valid, write_done : STD_LOGIC := '0';
 
 
@@ -226,13 +235,16 @@ architecture Structural of disassembler is
 
     signal ethernet_mode : STD_LOGIC := '0';
 
-    -- SIGNALS FOR INSTRUCTION QUEUE
+    -- SIGNALS FOR INSTRUCTION DECODER
+    signal pu_instruction : STD_LOGIC_VECTOR (31 downto 0);
+
+    -- SIGNALS FOR ASM QUEUE
     signal asm_enable_write, asm_enable_read, asm_status_full, asm_status_empty : STD_LOGIC;
-    signal queue_out, queue_in : STD_LOGIC_VECTOR (15 downto 0):= X"0000";
+    signal queue_out, queue_in : STD_LOGIC_VECTOR (15 downto 0);
     
     -- SIGNALS FOR ASM QUEUE
     signal asm_data_out : STD_LOGIC_VECTOR (31 downto 0);
-    signal asm_data_in : STD_LOGIC_VECTOR (255 downto 0);
+    signal asm_data_in : STD_LOGIC_VECTOR (255 downto 0) := X"0000000000000000000000000000000000000000000000000000000000000000";
     signal asm_queue_length : STD_LOGIC_VECTOR (15 downto 0);
     
     -- SIGNALS FOR TRANSMIT
@@ -253,15 +265,21 @@ architecture Structural of disassembler is
        clk_in1 => CLK100MHZ
     );
     
+    instruction_decoder : processing_unit port map(
+        clock => CLK100MHZ,
+        instruction => pu_instruction,
+        code => asm_data_in
+    );
+
     assembly_queue : asm_queue port map(
         clock => CLK100MHZ,
         reset => reset,
-        enable_write => enable_write,
+        enable_write => asm_enable_write,
         enable_read => asm_enable_read,
-        status_full => status_full,
+        status_full => asm_status_full,
         status_empty => asm_status_empty,
         queue_length => asm_queue_length,
-        data_in => data_in,
+        data_in => asm_data_in,
         data_out => asm_data_out
     );
     
@@ -389,6 +407,8 @@ architecture Structural of disassembler is
         variable udp_length : UNSIGNED(15 downto 0);
         variable ipv4_destination : STD_LOGIC_VECTOR (31 downto 0);
         variable packet_length : signed(15 downto 0);
+
+        variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
     begin
         -- RESET LOGIC
         -- ACTIVE LOW!
@@ -433,7 +453,7 @@ architecture Structural of disassembler is
                         if read_done = '1' then
                             ipv4_destination  (15 downto 0) :=  rdata (31 downto 16);
                             read_valid <= '1';
-                            if ipv4_destination = FPGA_IPV4_ADDRESS then
+                            if ipv4_destination = TX_DESIINATION_IPV4_ADDRESS then
                                 receive_state := receive_state + 1;
                                 araddr <= UDP_LENGTH_ADDRESS;
                             else
@@ -453,10 +473,15 @@ architecture Structural of disassembler is
                     when 4 =>
                         if read_done = '1' then
                             araddr <= STD_LOGIC_VECTOR(UNSIGNED(araddr) + 4);
-                            wdata <= rdata;
                             if packet_length > 0 then
                                 packet_length := packet_length - 4;
+
+                                -- PROCESS DATA
+                                pu_instruction <= rdata;
+                                asm_enable_write <= '1';
+
                             else
+                                asm_enable_write <= '0';
                                 receive_state := receive_state + 1;
                                 awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
                                 wdata <= X"00000000";
@@ -479,7 +504,10 @@ architecture Structural of disassembler is
                         end if;
 
                     when 6 => 
-                            receive_state := 0;
+                        receive_state := 0;
+
+                        r_led := not r_led;
+                        led <= r_led;
 
                     when others =>
                         receive_state := 0;
@@ -634,9 +662,9 @@ architecture Structural of disassembler is
         variable state : INTEGER := 0;
     begin
         if rising_edge(CLK100MHZ) then
-            case state is 
-                when 0 =>
+            case state is
 
+                when 0 =>
                     if receive_done = '1' then
                         state := state + 1;
                         ethernet_mode <= TRANSMIT_MODE;

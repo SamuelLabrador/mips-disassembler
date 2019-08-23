@@ -22,7 +22,8 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 USE ieee.numeric_std.ALL;
-
+use STD.textio.all;
+use ieee.std_logic_textio.all;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -61,14 +62,14 @@ architecture Behavioral of disassembler_tb is
             
             eth_rxerr : in STD_LOGIC;                    -- Error 
             
-            led : out STD_LOGIC_VECTOR (3 downto 0);      -- For debugging
+            led : out STD_LOGIC_VECTOR (3 downto 0)      -- For debugging
             
             
-            enable_write : IN STD_LOGIC;
+--            enable_write : IN STD_LOGIC;
 --            enable_read : IN STD_LOGIC;
-            status_full : OUT STD_LOGIC;
-            status_empty : out STD_LOGIC;
-            data_in : in STD_LOGIC_VECTOR (255 downto 0)
+--            status_full : OUT STD_LOGIC;
+--            status_empty : out STD_LOGIC;
+--            data_in : in STD_LOGIC_VECTOR (255 downto 0)
 --            data_out : OUT STD_LOGIC_VECTOR
         );
     end component disassembler;
@@ -84,7 +85,6 @@ architecture Behavioral of disassembler_tb is
     
     signal start_send : STD_LOGIC := '0';
     
-    signal counter : INTEGER := 144;
     
         function STRING_TO_LOGIC_VECTOR( 
         target_string : string
@@ -98,16 +98,14 @@ architecture Behavioral of disassembler_tb is
         return logic_vector;
     end function;
     
-    
-    
 begin
-    process (r_eth_rx_clk) begin
-        if rising_edge(r_eth_rx_clk) then
+--    process (r_eth_rx_clk) begin
+--        if rising_edge(r_eth_rx_clk) then
         
---            r_eth_rxd <= r_eth_txd;
---            r_eth_rx_dv <= r_eth_tx_en;
-        end if;
-    end process;
+----            r_eth_rxd <= r_eth_txd;
+----            r_eth_rx_dv <= r_eth_tx_en;
+--        end if;
+--    end process;
     
     UUT : disassembler port map(
         CLK100MHZ => r_clk,
@@ -123,14 +121,14 @@ begin
         eth_tx_en => r_eth_tx_en,
         eth_txd => r_eth_txd,
         eth_rxerr => r_eth_rxerr,
-        led => r_led,
+        led => r_led
         
         
-        enable_write => r_enable_write,
---        enable_read => r_enable_read,
-        data_in => r_data_in, 
-        status_full => r_status_full,
-        status_empty => r_status_empty
+--        enable_write => r_enable_write,
+----        enable_read => r_enable_read,
+--        data_in => r_data_in, 
+----        status_full => r_status_full,
+--        status_empty => r_status_empty
     );
     
     -- 100 MHZ clock generation
@@ -154,71 +152,82 @@ begin
         r_reset <= '1';
         wait;
     end process;
-     
+    
+--    queue_generation : process (r_clk)
         
- 
-        process (r_clk)
-        
-        variable logic_vector : STD_LOGIC_VECTOR(255 downto 0);
-        variable state : INTEGER := 0;
-    begin
-        if rising_edge(r_clk) then
-                if r_reset /= '0' then
-                    case state is 
-                    
-                        when 0 =>
-                            
-                            r_data_in <= STRING_TO_LOGIC_VECTOR("AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH");
-                            
-                            r_enable_write <= '1';     
-                            state := state + 1;
-                            
-                        when 1=>
-                       
-                            r_enable_write <= '0';
-    --                        r_enable_read <= '1';
-                            if (r_status_empty = '1') then
-                                state := state + 1;
-                            end if;
-                            
-                        when 2=>
-                            
-                            
-                       when others =>
-                    end case;
-                end if;
-            end if;
-    end process;
-   
-   
---   process begin
---        wait for 5 ns;
---        start_send <= '1';
---   end process;
-   
---    send_packet : process (r_eth_rx_clk, r_reset)
---        variable packet : STD_LOGIC_VECTOR (851  downto 0) := X"5555555555555555d0000e500afecfeedfacebeef080045000054059f400040012f930a00020fc358361008002b4511220002a9f45c5300000000f57b010000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637";
+--        variable logic_vector : STD_LOGIC_VECTOR(255 downto 0);
+--        variable state : INTEGER := 0;
 --    begin
-        
---        if rising_edge(r_eth_rx_clk) then
-            
---            -- ACTIVE LOW
---            if r_reset = '0' then
---                counter <= 208;
-            
---            else 
---                if counter = 0 then
---                    r_eth_rx_dv <= '0';
-                
---                else
---                    r_eth_rx_dv <= '1';
---                    r_eth_rxd <= packet (((counter * 4) - 1) downto ((counter - 1) * 4));
-----                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
---                    counter <= counter - 1;
+--        if rising_edge(r_clk) then
+--                if r_reset /= '0' then
+--                    case state is 
+                    
+--                        when 0 =>
+                            
+--                            r_data_in <= STRING_TO_LOGIC_VECTOR("AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH");
+                            
+--                            r_enable_write <= '1';     
+--                            state := state + 1;
+                            
+--                        when 1=>
+                       
+--                            r_enable_write <= '0';
+--    --                        r_enable_read <= '1';
+--                            if (r_status_empty = '1') then
+--                                state := state + 1;
+--                            end if;
+                            
+--                        when 2=>
+                            
+                            
+--                       when others =>
+--                    end case;
 --                end if;
 --            end if;
---        end if;
 --    end process;
+   
+--    packet_dump : process(r_clk)
+        
+--        file packet_test : text open write_mode is "packet.txt";
+--        variable row : line;
+--    begin
+--        if rising_edge(r_eth_tx_clk) then
+--            if (r_eth_tx_en = '1') then
+--                write(row, r_eth_txd, right, 4);
+--                writeline(packet_test, row);
+--            end if;
+--        end if;
+--    end process
+    
+   process begin
+        wait for 3000 ns;
+        start_send <= '1';
+   end process;
+   
+    send_packet : process (r_eth_rx_clk, r_reset)
+        variable packet : STD_LOGIC_VECTOR (1471  downto 0) := X"555555555555555d0000e500afec0000ecaf00e5f20087000000432111ff00008a0c43211291b0100d70118602000d700000000014141414242424243434343444444444545454546464646474747474848484840000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006ae77fe2";
+        variable counter : INTEGER := (packet'length / 4 - 1);
+    begin
+        
+        if rising_edge(r_eth_rx_clk) and start_send = '1' then
+            
+            -- ACTIVE LOW
+            if r_reset = '0' then
+                counter := packet'length / 4 - 1;
+            
+            else 
+                if counter = 0 then
+                    r_eth_rx_dv <= '0';
+                
+                else
+                    r_eth_rx_dv <= '1';
+                    r_eth_rxd <= packet (((counter * 4) - 1) downto ((counter - 1) * 4));
+--                    r_eth_rxd <= packet(counter * 4 - 4) & packet(counter * 4 - 3) & packet(counter * 4 - 2) & packet(counter * 4 -1);
+                    counter := counter - 1;
+                end if;
+            end if;
+        end if;
+    end process;
     
 
 end Behavioral;
