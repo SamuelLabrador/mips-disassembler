@@ -48,7 +48,7 @@ entity disassembler is
         
         -- NETWORKING INFO
         FPGA_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"00005E00FACE";
-        FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"C0A8010B";  -- 192.168.1.11
+        FPGA_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"C0A8010B";  -- 192.168.1.11 -- C0A8010B
 
         -- 00A7000037F5
         -- Transmit --> 00007A005F73
@@ -58,8 +58,8 @@ entity disassembler is
         -- 0x0000   00 5E 00 00 
         -- 0x0001   00 00 CE FA
                                                                        --54AB3AB54511
-        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"005E0000CEFA";--X"54AB3AB54511";
-        TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"19216811";
+        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"FFFFFFFFFFFF";--X"54AB3AB54511";
+        TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"C0A80101";
         TX_DESITNATION_PORT : STD_LOGIC_VECTOR (15 downto 0) := X"07D0";
 
         -- DATA LOCATIONS IN DUAL PORT MEMORY
@@ -129,6 +129,8 @@ end disassembler;
 
 architecture Structural of disassembler is
 
+    signal tx_state, rx_state : INTEGER;
+    
     -- CLOCK WIZARD SIGNALS
     signal CLK25MHZ : STD_LOGIC := '0';
     
@@ -144,6 +146,7 @@ architecture Structural of disassembler is
     signal bresp, rresp : STD_LOGIC_VECTOR(1 DOWNTO 0);
     
     signal init_flag : STD_LOGIC := '0';
+
     
     -- CLOCKING WIZARD
     component clk_wiz_0 IS
@@ -230,6 +233,7 @@ architecture Structural of disassembler is
     -- SIGNALS FOR ETHERNET READ/WRITE HANDSHAKE SLAVE STATE MACHINES
     signal read_valid, read_done, write_valid, write_done : STD_LOGIC := '0';
 
+    signal IPADDRESS : STD_LOGIC_VECTOR (31 downto 0);
 
     signal transmit_valid, transmit_done, receive_valid, receive_done : STD_LOGIC := '0';
 
@@ -410,6 +414,8 @@ architecture Structural of disassembler is
 
         variable r_led : STD_LOGIC_VECTOR (3 downto 0) := X"0";
     begin
+        tx_state <= transmit_state;
+        rx_state <= receive_state;
         -- RESET LOGIC
         -- ACTIVE LOW!
         if reset = '0' then
@@ -446,14 +452,15 @@ architecture Structural of disassembler is
                     when 1 =>
                         if read_done = '1' then
                             receive_state := receive_state + 1;
-                            ipv4_destination (31 downto 16) := rdata (15 downto 0);
+                            ipv4_destination (31 downto 16) := rdata (23 downto 16) & rdata (31 downto 24);
                             araddr <= '1' & X"020";
                         end if; 
                     when 2 =>
                         if read_done = '1' then
-                            ipv4_destination  (15 downto 0) :=  rdata (31 downto 16);
+                            ipv4_destination  (15 downto 0) :=  rdata(23 downto 16) & rdata (31 downto 24);
                             read_valid <= '1';
-                            if ipv4_destination = TX_DESIINATION_IPV4_ADDRESS then
+                            IPADDRESS <= ipv4_destination;
+                            if ipv4_destination = FPGA_IPV4_ADDRESS then
                                 receive_state := receive_state + 1;
                                 araddr <= UDP_LENGTH_ADDRESS;
                             else
@@ -477,17 +484,20 @@ architecture Structural of disassembler is
                                 packet_length := packet_length - 4;
 
                                 -- PROCESS DATA
-                                pu_instruction <= rdata;
-                                asm_enable_write <= '1';
+                                if(rdata /= X"00000000") then 
+                                    pu_instruction <= rdata;
+                                    asm_enable_write <= '1';
+                                end if;
 
                             else
-                                asm_enable_write <= '0';
                                 receive_state := receive_state + 1;
                                 awaddr <= RECEIVE_CONTROL_REGISTER_ADDRESS;
                                 wdata <= X"00000000";
                                 write_valid <= '1';
                                 read_valid  <= '0';
                             end if;
+                        else
+                            asm_enable_write <= '0';
                         end if;
 
                     when 5 =>
@@ -504,7 +514,9 @@ architecture Structural of disassembler is
                         end if;
 
                     when 6 => 
+                        read_valid <= '0';
                         receive_state := 0;
+                        receive_done <= '0';
 
                         r_led := not r_led;
                         led <= r_led;

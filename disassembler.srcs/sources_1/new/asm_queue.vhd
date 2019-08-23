@@ -33,7 +33,7 @@ USE ieee.numeric_std.ALL;
 --use UNISIM.VComponents.all;
 
 entity asm_queue is
-    generic (depth : INTEGER := 4096);
+    generic (depth : INTEGER := 512);
   Port ( 
   		clock : in STD_LOGIC;
   		reset : in STD_LOGIC;
@@ -54,7 +54,6 @@ architecture Behavioral of asm_queue is
     signal memory : memory_type :=(others => (others => '0'));   --memory for queue.
     signal addr_read, addr_write: integer := 0;  --read and write pointers.
     signal empty,full : std_logic := '0';
-    
     
 begin
 
@@ -91,6 +90,12 @@ begin
             else
                 empty <= '0';
             end if;
+
+            if(element_count = depth) then
+                full <= '1';
+            else
+                full <= '0';
+            end if;
         end if;
         
         -- "push" element on queue
@@ -104,7 +109,6 @@ begin
             memory(addr_write + 5) <= data_in (95 downto 64);
             memory(addr_write + 6) <= data_in (63 downto 32);
             memory(addr_write + 7) <= data_in (31 downto 0);
-
 
             addr_write <= addr_write + 7;  
             element_count := element_count + 32;     
@@ -121,8 +125,6 @@ begin
             empty <= '0';
            
         end if;
-        
-        
         
     end if; 
 end process;
