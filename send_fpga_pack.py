@@ -1,10 +1,11 @@
 from socket import *
+
 import time
 import datetime
 
-def sendeth(ethernet_packet, payload, interface = "[00000002] Realtek PCIe GBE Family Controller"):
+def sendeth(packet, interface ='54-AB-3A-B5-45-11'):
   """Send raw Ethernet packet on interface."""
-  s = socket(AF_PACKET, SOCK_RAW)
+  s = socket(AF_INET, SOCK_RAW)
 
   # From the docs: "For raw packet
   # sockets the address is a tuple (ifname, proto [,pkttype [,hatype]])"
@@ -13,10 +14,6 @@ def sendeth(ethernet_packet, payload, interface = "[00000002] Realtek PCIe GBE F
   # print((ethernet_packet + payload).encode('hex'))
   return s.send(ethernet_packet + payload)
 
-def pack(byte_sequence):
-  """Convert list of bytes to byte string."""
-  # return b"".join(map(chr, byte_sequence))
-  return byte_sequence
 
 if __name__ == "__main__":
       # Note that this example contains HARDCODED packets, meaning that
@@ -28,52 +25,55 @@ if __name__ == "__main__":
 
       # src=fe:ed:fa:ce:be:ef, dst=00:00:5E:00:FA:CE, type=0x0800 (IP)
       ethernet_packet = [ 0x00, 0x00, 0x5E, 0x00, 
-                          0xFA, 0xCE, 0xfe, 0xed, 
-                          0xfa, 0xce, 0xbe, 0xef, 
+                          0xFA, 0xCE, 0xFF, 0xFF, 
+                          0xFF, 0xFF, 0xFF, 0xFF, 
                           0x08, 0x00
                         ]
-
+      # print(ep_str)
       # src=10.0.2.15, dst=195.88.54.16 (vg.no), checksum, etc.
 
-      # C0A8010B
-      ipv4_header = [ 
-                      0x45, 0x00, 0x00, 0x54, 
-                      0x05, 0x9f, 0x40, 0x00, 
-                      0x40, 0x01, 0x2f, 0x93, 
-                      0x0a, 0x00, 0x02, 0x0f, 
-                      0xC0, 0xA8, 0x01, 0x0B,
-                    ]
-
       # echo (ping) request, checksum 2b45, etc
-      icmp_ping = [ 0x08, 0x00, 0x2b, 0x45, 
-                    0x11, 0x22, 0x00, 0x02, 
-                    0xa9, 0xf4, 0x5c, 0x53, 
-                    0x00, 0x00, 0x00, 0x00, 
-                    0xf5, 0x7b, 0x01, 0x00, 
-                    0x00, 0x00, 0x00, 0x00, 
-                    0x10, 0x11, 0x12, 0x13, 
-                    0x14, 0x15, 0x16, 0x17, 
-                    0x18, 0x19, 0x1a, 0x1b, 
-                    0x1c, 0x1d, 0x1e, 0x1f, 
-                    0x20, 0x21, 0x22, 0x23,
-                    0x24, 0x25, 0x26, 0x27, 
-                    0x28, 0x29, 0x2a, 0x2b, 
-                    0x2c, 0x2d, 0x2e, 0x2f, 
-                    0x30, 0x31, 0x32, 0x33, 
-                    0x34, 0x35, 0x36, 0x37
+      udp_data = [ 0x00, 0x00, 0x00, 0x00, 
+                    0x00, 0x0C, 0x00, 0x00, 
+                    0x08, 0x00, 0x00, 0x02, 
+                  ]# FIRST OPCODE
+
+      padding = [   0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
                   ]
 
-      # payload = "".join(map(chr, ipv4_header + icmp_ping))
-      payload = ipv4_header + icmp_ping
 
+      ipv4_len = hex(20 + len(udp_data)) 
+
+      ipv4_header = [ 
+                      0x45, 0x00, 0x00, ipv4_len, 
+                      0x00, 0x10, 0x00, 0x00, 
+                      0xFF, 0x11, 0x00, 0x00, 
+                      0x0a, 0x00, 0x02, 0x0f, 
+                      0x01, 0x45, 0x57, 0x26,
+                    ]
 
       # Construct Ethernet packet with an IPv4 ICMP PING request as payload
+      packet = ethernet_packet + ipv4_header + udp_data + padding
+      
+      sendeth(packet)
 
-      while True:
-        r = sendeth(pack(ethernet_packet),
-                    pack(ipv4_header + icmp_ping))
-        print("Sent Ethernet w/IPv4 ICMP PING payload of length %d bytes @ %s" % (r, datetime.datetime.now()))
-        time.sleep(0.5)
+      # while True:
+      #   r = sendeth(pack(ethernet_packet),
+      #               pack(ipv4_header + icmp_ping))
+      #   print("Sent Ethernet w/IPv4 ICMP PING payload of length %d bytes @ %s" % (r, datetime.datetime.now()))
+      #   time.sleep(0.5)
       # r = sendeth(pack(ethernet_packet),
       #             pack(ipv4_header + icmp_ping))
       
