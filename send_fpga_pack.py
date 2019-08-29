@@ -3,7 +3,7 @@ from socket import *
 import time
 import datetime
 
-def sendeth(packet, interface ='54-AB-3A-B5-45-11'):
+def sendeth(packet, interface =''):
   """Send raw Ethernet packet on interface."""
   s = socket(AF_INET, SOCK_RAW)
 
