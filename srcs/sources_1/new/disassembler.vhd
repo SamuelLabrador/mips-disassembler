@@ -52,8 +52,8 @@ entity disassembler is
 
         -- My Laptop: 192.168.1.147
 
-        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"FFFFFFFFFFFF";--X"54AB3AB54511";
-        TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"C0A80193";
+        TX_DESTINATION_MAC_ADDRESS : STD_LOGIC_VECTOR (47 downto 0) := X"54AB3AB54511";
+        TX_DESIINATION_IPV4_ADDRESS : STD_LOGIC_VECTOR (31 downto 0) := X"C0A80193"; 
         TX_DESITNATION_PORT : STD_LOGIC_VECTOR (15 downto 0) := X"07D0";
 
         -- DATA LOCATIONS IN DUAL PORT MEMORY
@@ -453,6 +453,11 @@ architecture Structural of disassembler is
                             if rdata(0) = '1' then
                                 receive_state := receive_state + 1;
                                 araddr <= '1' & X"01C";
+
+                                
+                                -- Received a packet
+                                r_led := not r_led;
+                                led <= r_led;
                             end if;
                         end if;
 
@@ -554,9 +559,6 @@ architecture Structural of disassembler is
                         receive_state := 0;
                         receive_done <= '0';
 
-                        r_led := not r_led;
-                        led <= r_led;
-
                     when others =>
                         receive_state := 0;
 
@@ -607,7 +609,11 @@ architecture Structural of disassembler is
                             awaddr <= STD_LOGIC_VECTOR(UNSIGNED(awaddr) + 4);
                             
                             wdata <= ipv4_length(23 downto 16) &  X"450008";    -- LENGTH[23:16] | IP VERSION
-                            udp_length := unsigned(asm_queue_length) + 8;         
+                            udp_length := 8 
+                                        + unsigned(asm_queue_length) 
+                                        + unsigned(asm_queue_length)
+                                        + unsigned(asm_queue_length)
+                                        + unsigned(asm_queue_length);         
                             udp_length_vector := STD_LOGIC_VECTOR(udp_length);
                         end if;
 
